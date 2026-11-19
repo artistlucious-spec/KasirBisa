@@ -19,8 +19,9 @@
 
 ## Akun dan bantuan
 
-- Login satu akun pemilik; tidak tersedia pendaftaran publik.
+- Pengguna dapat mendaftar akun usaha dengan nama usaha, nama pengguna, nomor WhatsApp, dan password.
+- Data produk, transaksi, stok, laporan, serta profil dipisahkan untuk setiap usaha.
 - Sesi menggunakan cookie `HttpOnly` dengan masa aktif 12 jam.
 - Menu hamburger mengakses Kasir, Rekap, Smart Insight, Panduan, Profil, dan Keluar.
-- Halaman Profil dapat mengganti username, password dengan verifikasi password saat ini, serta foto profil.
+- Halaman Profil menampilkan nama usaha dan WhatsApp, serta dapat mengganti username, password dengan verifikasi password saat ini, dan foto profil.
 - Panduan tersedia sebagai halaman website dan dokumentasi Markdown.

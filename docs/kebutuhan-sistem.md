@@ -2,9 +2,9 @@
 
 ## Pengguna
 
-- Pemilik menggunakan akun tunggal untuk mengakses website.
-- Tidak ada pendaftaran akun publik.
-- Username dan password akun awal disiapkan oleh administrator Cloudflare.
+- Setiap pemilik usaha dapat membuat akun sendiri menggunakan nama usaha, nama pengguna, nomor WhatsApp, dan password.
+- Data setiap usaha harus terisolasi; pengguna hanya dapat membaca atau mengubah data usahanya sendiri.
+- Akun lama dipertahankan sebagai satu usaha terpisah setelah migrasi. Secret `KASIR_USERNAME` dan `KASIR_PASSWORD` tetap dapat dipakai untuk membuat akun lama jika belum tersimpan di D1.
 
 ## Perangkat dan browser
 
@@ -18,10 +18,10 @@
 - Cloudflare Pages untuk hosting halaman statis dan Pages Functions.
 - Cloudflare D1 terikat pada binding `DB`.
 - Secret `AUTH_SESSION_SECRET` dengan panjang minimal 32 karakter.
-- Secret `KASIR_USERNAME` dan `KASIR_PASSWORD` (minimal 12 karakter) untuk membuat akun pemilik pertama kali jika baris profil belum tersedia.
+- Secret `KASIR_USERNAME` dan `KASIR_PASSWORD` (minimal 12 karakter) opsional, hanya untuk bootstrap akun lama saat diperlukan.
 - `GEMINI_API_KEY` hanya diperlukan untuk membuat insight dengan Gemini; ringkasan dasar dihitung dari data D1.
 
-Database harus menerapkan semua file migrasi dalam `migrations/`, termasuk `0003_owner_profile.sql`, sebelum halaman Profil digunakan. Pastikan migrasi remote menyasar database D1 dan project Cloudflare Pages `kasirbisa` yang benar.
+Database harus menerapkan semua file migrasi dalam `migrations/`, termasuk `0004_multi_tenant_accounts.sql`, sebelum pendaftaran dan login digunakan. Migrasi tersebut memindahkan akun serta data lama ke usaha legacy dan mengharuskan pengguna lama login kembali. Pastikan migrasi remote menyasar database D1 dan project Cloudflare Pages `kasirbisa` yang benar.
 
 ## Batasan unggah foto
 

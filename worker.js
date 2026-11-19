@@ -2,9 +2,13 @@ const MAX_PRODUCT_IMAGE_LENGTH = 140 * 1024;
 const AUTH_COOKIE_NAME = "kasir_bisa_session";
 const AUTH_SESSION_SECONDS = 12 * 60 * 60;
 const PASSWORD_HASH_ITERATIONS = 100_000;
-const AUTH_SETUP_MESSAGE = "Profil akun belum tersedia. Administrator perlu membuat secret KASIR_USERNAME, KASIR_PASSWORD, dan AUTH_SESSION_SECRET di Cloudflare lalu menerapkan migrasi D1 terbaru.";
+const AUTH_SETUP_MESSAGE = "Autentikasi belum siap. Administrator perlu mengatur AUTH_SESSION_SECRET dan menerapkan migrasi D1 terbaru.";
 const textEncoder = new TextEncoder();
-const OWNER_PROFILE_SELECT = "SELECT username, password_hash, password_salt, password_iterations, profile_image, session_version FROM owner_profile WHERE id = 1";
+const USER_SELECT = `SELECT
+  users.id, users.business_id, users.username, users.whatsapp,
+  users.password_hash, users.password_salt, users.password_iterations,
+  users.profile_image, users.session_version, businesses.name AS business_name
+  FROM users JOIN businesses ON businesses.id = users.business_id`;
 
 function json(data, status = 200, extraHeaders = {}) {
   return Response.json(data, {
@@ -26,20 +30,6 @@ function bootstrapCredentialsConfigured(env) {
     && env.KASIR_PASSWORD.length >= 12
     && env.KASIR_PASSWORD.length <= 256
     && sessionSecretConfigured(env);
-}
-
-async function sameSecret(supplied, expected) {
-  const [suppliedHash, expectedHash] = await Promise.all([
-    crypto.subtle.digest("SHA-256", textEncoder.encode(supplied)),
-    crypto.subtle.digest("SHA-256", textEncoder.encode(expected)),
-  ]);
-  const suppliedBytes = new Uint8Array(suppliedHash);
-  const expectedBytes = new Uint8Array(expectedHash);
-  let difference = 0;
-  for (let index = 0; index < suppliedBytes.length; index += 1) {
-    difference |= suppliedBytes[index] ^ expectedBytes[index];
-  }
-  return difference === 0;
 }
 
 async function derivePasswordHash(password, salt, iterations) {
@@ -89,20 +79,20 @@ async function verifyPassword(password, profile) {
   return difference === 0;
 }
 
-async function getOwnerProfile(env) {
-  return env.DB.prepare(OWNER_PROFILE_SELECT).first();
+async function getUserById(env, id) {
+  return env.DB.prepare(`${USER_SELECT} WHERE users.id = ?`).bind(id).first();
 }
 
-async function getOrCreateOwnerProfile(env) {
-  let profile = await getOwnerProfile(env);
-  if (profile || !bootstrapCredentialsConfigured(env)) return profile;
+async function getOrCreateLegacyUser(env) {
+  let user = await getUserById(env, "legacy-owner");
+  if (user || !bootstrapCredentialsConfigured(env)) return user;
 
   const credentials = await hashPassword(env.KASIR_PASSWORD);
   await env.DB.prepare(
-    "INSERT OR IGNORE INTO owner_profile (id, username, password_hash, password_salt, password_iterations) VALUES (1, ?, ?, ?, ?)"
+    "INSERT OR IGNORE INTO users (id, business_id, username, password_hash, password_salt, password_iterations) VALUES ('legacy-owner', 'legacy-business', ?, ?, ?, ?)"
   ).bind(env.KASIR_USERNAME.trim(), credentials.hash, credentials.salt, credentials.iterations).run();
-  profile = await getOwnerProfile(env);
-  return profile;
+  user = await getUserById(env, "legacy-owner");
+  return user;
 }
 
 function bytesToBase64Url(bytes) {
@@ -117,10 +107,10 @@ function base64UrlToBytes(value) {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
-async function createSessionToken(secret, sessionVersion) {
+async function createSessionToken(secret, userId, sessionVersion) {
   const expiry = String(Math.floor(Date.now() / 1000) + AUTH_SESSION_SECONDS);
   const version = String(sessionVersion);
-  const payload = `${expiry}.${version}`;
+  const payload = `${userId}.${expiry}.${version}`;
   const key = await crypto.subtle.importKey(
     "raw",
     textEncoder.encode(secret),
@@ -132,33 +122,33 @@ async function createSessionToken(secret, sessionVersion) {
   return `${payload}.${bytesToBase64Url(new Uint8Array(signature))}`;
 }
 
-async function hasValidSession(request, env, profile) {
-  if (!profile || !sessionSecretConfigured(env)) return false;
+async function getSessionUser(request, env) {
+  if (!sessionSecretConfigured(env)) return null;
   const cookie = (request.headers.get("Cookie") || "")
     .split(";")
     .map((part) => part.trim())
     .find((part) => part.startsWith(`${AUTH_COOKIE_NAME}=`));
-  if (!cookie) return false;
+  if (!cookie) return null;
 
   const token = cookie.slice(AUTH_COOKIE_NAME.length + 1);
-  const [expiry, version, encodedSignature, ...extraParts] = token.split(".");
+  const [userId, expiry, version, encodedSignature, ...extraParts] = token.split(".");
   if (
     extraParts.length
+    || !/^[\w-]{1,128}$/.test(userId)
     || !/^\d{10,}$/.test(expiry)
     || !/^\d+$/.test(version)
-    || version !== String(profile.session_version)
     || Number(expiry) <= Math.floor(Date.now() / 1000)
   ) {
-    return false;
+    return null;
   }
 
   let signature;
   try {
     signature = base64UrlToBytes(encodedSignature);
   } catch {
-    return false;
+    return null;
   }
-  if (signature.length !== 32) return false;
+  if (signature.length !== 32) return null;
   const key = await crypto.subtle.importKey(
     "raw",
     textEncoder.encode(env.AUTH_SESSION_SECRET),
@@ -166,7 +156,16 @@ async function hasValidSession(request, env, profile) {
     false,
     ["verify"]
   );
-  return crypto.subtle.verify("HMAC", key, signature, textEncoder.encode(`${expiry}.${version}`));
+  const valid = await crypto.subtle.verify(
+    "HMAC",
+    key,
+    signature,
+    textEncoder.encode(`${userId}.${expiry}.${version}`)
+  );
+  if (!valid) return null;
+
+  const user = await getUserById(env, userId);
+  return user && version === String(user.session_version) ? user : null;
 }
 
 function cookieHeaders(request, token, maxAge) {
@@ -197,12 +196,65 @@ async function authApi(request, env, pathname) {
     });
   }
 
+  if (pathname === "/api/auth/signup" && request.method === "POST") {
+    if (!sessionSecretConfigured(env)) {
+      return json({ error: AUTH_SETUP_MESSAGE }, 503);
+    }
+    await getOrCreateLegacyUser(env);
+    const body = await parseJsonBody(request);
+    if (!body) return json({ error: "Format pendaftaran tidak valid." }, 400);
+
+    const businessName = typeof body.businessName === "string" ? body.businessName.trim() : "";
+    const username = typeof body.username === "string" ? body.username.trim() : "";
+    const rawWhatsapp = typeof body.whatsapp === "string" ? body.whatsapp.trim() : "";
+    const whatsapp = rawWhatsapp.replace(/\D/g, "");
+    const password = typeof body.password === "string" ? body.password : "";
+    if (
+      !businessName || businessName.length > 120
+      || !username || username.length > 128
+      || !/^[+()\d\s.-]+$/.test(rawWhatsapp)
+      || !/^[\d]{8,15}$/.test(whatsapp)
+      || password.length < 12 || password.length > 256
+    ) {
+      return json({ error: "Periksa kembali nama usaha, nama pengguna, WhatsApp, dan password (12–256 karakter)." }, 400);
+    }
+
+    const existing = await env.DB.prepare(
+      "SELECT id FROM users WHERE username = ? COLLATE NOCASE OR whatsapp = ?"
+    ).bind(username, whatsapp).first();
+    if (existing) return json({ error: "Nama pengguna atau nomor WhatsApp sudah terdaftar." }, 409);
+
+    const userId = crypto.randomUUID();
+    const businessId = crypto.randomUUID();
+    const credentials = await hashPassword(password);
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO businesses (id, name) VALUES (?, ?)").bind(businessId, businessName),
+      env.DB.prepare(
+        "INSERT INTO users (id, business_id, username, whatsapp, password_hash, password_salt, password_iterations) VALUES (?, ?, ?, ?, ?, ?, ?)"
+      ).bind(
+        userId,
+        businessId,
+        username,
+        whatsapp,
+        credentials.hash,
+        credentials.salt,
+        credentials.iterations
+      ),
+    ]);
+
+    const token = await createSessionToken(env.AUTH_SESSION_SECRET, userId, 1);
+    return json(
+      { success: true },
+      201,
+      cookieHeaders(request, token, AUTH_SESSION_SECONDS)
+    );
+  }
+
   if (pathname === "/api/auth/login" && request.method === "POST") {
     if (!sessionSecretConfigured(env)) {
       return json({ error: AUTH_SETUP_MESSAGE }, 503);
     }
-    const profile = await getOrCreateOwnerProfile(env);
-    if (!profile) return json({ error: AUTH_SETUP_MESSAGE }, 503);
+    await getOrCreateLegacyUser(env);
     const body = await parseJsonBody(request);
     if (!body) {
       return json({ error: "Format permintaan login tidak valid." }, 400);
@@ -213,15 +265,18 @@ async function authApi(request, env, pathname) {
       return json({ error: "Nama pengguna atau password salah." }, 401);
     }
 
-    const [usernameMatches, passwordMatches] = await Promise.all([
-      sameSecret(username, profile.username),
-      verifyPassword(password, profile),
-    ]);
-    if (!usernameMatches || !passwordMatches) {
+    const lookup = username.replace(/\D/g, "");
+    const user = await env.DB.prepare(
+      `${USER_SELECT} WHERE username = ? COLLATE NOCASE OR (whatsapp <> '' AND whatsapp = ?)`
+    ).bind(username, lookup).first();
+    const passwordMatches = user
+      ? await verifyPassword(password, user)
+      : await derivePasswordHash(password, new Uint8Array(16), PASSWORD_HASH_ITERATIONS);
+    if (!user || !passwordMatches) {
       return json({ error: "Nama pengguna atau password salah." }, 401);
     }
 
-    const token = await createSessionToken(env.AUTH_SESSION_SECRET, profile.session_version);
+    const token = await createSessionToken(env.AUTH_SESSION_SECRET, user.id, user.session_version);
     return json({ success: true }, 200, cookieHeaders(request, token, AUTH_SESSION_SECONDS));
   }
 
@@ -229,10 +284,11 @@ async function authApi(request, env, pathname) {
     if (!sessionSecretConfigured(env)) {
       return json({ authenticated: false, error: AUTH_SETUP_MESSAGE }, 503);
     }
-    const profile = await getOrCreateOwnerProfile(env);
-    if (!profile) return json({ authenticated: false, error: AUTH_SETUP_MESSAGE }, 503);
+    await getOrCreateLegacyUser(env);
+    const user = await getSessionUser(request, env);
     return json({
-      authenticated: await hasValidSession(request, env, profile),
+      authenticated: Boolean(user),
+      ...(user ? { username: user.username, businessName: user.business_name } : {}),
     });
   }
 
@@ -240,13 +296,17 @@ async function authApi(request, env, pathname) {
     if (!sessionSecretConfigured(env)) {
       return json({ error: AUTH_SETUP_MESSAGE }, 503);
     }
-    const profile = await getOrCreateOwnerProfile(env);
-    if (!profile) return json({ error: AUTH_SETUP_MESSAGE }, 503);
-    if (!await hasValidSession(request, env, profile)) {
+    const user = await getSessionUser(request, env);
+    if (!user) {
       return json({ error: "Sesi login tidak valid. Silakan masuk kembali." }, 401);
     }
     if (request.method === "GET") {
-      return json({ username: profile.username, profileImage: profile.profile_image });
+      return json({
+        username: user.username,
+        whatsapp: user.whatsapp,
+        businessName: user.business_name,
+        profileImage: user.profile_image,
+      });
     }
 
     const body = await parseJsonBody(request);
@@ -265,40 +325,45 @@ async function authApi(request, env, pathname) {
     if (hasImage && !validProductImage(profileImage)) {
       return json({ error: "Foto profil tidak valid atau terlalu besar." }, 400);
     }
-    if (!await verifyPassword(currentPassword, profile)) {
+    if (!await verifyPassword(currentPassword, user)) {
       return json({ error: "Password saat ini salah." }, 401);
     }
-    if (!hasImage && !newPassword && username === profile.username) {
+    if (!hasImage && !newPassword && username === user.username) {
       return json({ error: "Tidak ada perubahan untuk disimpan." }, 400);
     }
+    const duplicate = await env.DB.prepare(
+      "SELECT id FROM users WHERE username = ? COLLATE NOCASE AND id != ?"
+    ).bind(username, user.id).first();
+    if (duplicate) return json({ error: "Nama pengguna sudah digunakan akun lain." }, 409);
 
     const nextPassword = newPassword ? await hashPassword(newPassword) : {
-      hash: profile.password_hash,
-      salt: profile.password_salt,
-      iterations: profile.password_iterations,
+      hash: user.password_hash,
+      salt: user.password_salt,
+      iterations: user.password_iterations,
     };
-    const credentialsChanged = username !== profile.username || Boolean(newPassword);
-    const sessionVersion = Number(profile.session_version) + (credentialsChanged ? 1 : 0);
+    const credentialsChanged = username !== user.username || Boolean(newPassword);
+    const sessionVersion = Number(user.session_version) + (credentialsChanged ? 1 : 0);
     const result = await env.DB.prepare(
-      "UPDATE owner_profile SET username = ?, password_hash = ?, password_salt = ?, password_iterations = ?, profile_image = COALESCE(?, profile_image), session_version = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
+      "UPDATE users SET username = ?, password_hash = ?, password_salt = ?, password_iterations = ?, profile_image = COALESCE(?, profile_image), session_version = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
     ).bind(
       username,
       nextPassword.hash,
       nextPassword.salt,
       nextPassword.iterations,
       profileImage,
-      sessionVersion
+      sessionVersion,
+      user.id
     ).run();
     if (!result.meta.changes) return json({ error: "Profil tidak ditemukan." }, 404);
 
     const headers = credentialsChanged
-      ? cookieHeaders(request, await createSessionToken(env.AUTH_SESSION_SECRET, sessionVersion), AUTH_SESSION_SECONDS)
+      ? cookieHeaders(request, await createSessionToken(env.AUTH_SESSION_SECRET, user.id, sessionVersion), AUTH_SESSION_SECONDS)
       : {};
     return json({
       success: true,
       profile: {
         username,
-        profileImage: hasImage ? profileImage : profile.profile_image,
+        profileImage: hasImage ? profileImage : user.profile_image,
       },
     }, 200, headers);
   }
@@ -325,10 +390,10 @@ function rupiah(value) {
   return `Rp${Number(value || 0).toLocaleString("id-ID")}`;
 }
 
-async function getProducts(env) {
+async function getProducts(env, businessId) {
   const result = await env.DB.prepare(
-    "SELECT id, code, barcode, name, category, price, stock, image FROM products ORDER BY name"
-  ).all();
+    "SELECT id, code, barcode, name, category, price, stock, image FROM products WHERE business_id = ? ORDER BY name"
+  ).bind(businessId).all();
   return (result.results || []).map((row) => ({
     kode: row.code,
     id: Number(row.id) || row.id,
@@ -341,10 +406,10 @@ async function getProducts(env) {
   }));
 }
 
-async function getTransactions(env) {
+async function getTransactions(env, businessId) {
   const result = await env.DB.prepare(
-    "SELECT id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member FROM transactions ORDER BY waktu DESC"
-  ).all();
+    "SELECT id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member FROM transactions WHERE business_id = ? ORDER BY waktu DESC"
+  ).bind(businessId).all();
   const transactions = [];
   for (const row of result.results || []) {
     const items = await env.DB.prepare(
@@ -371,9 +436,9 @@ async function getTransactions(env) {
   return transactions;
 }
 
-async function productsApi(request, env, pathname) {
+async function productsApi(request, env, pathname, businessId) {
   if (request.method === "GET" && pathname === "/api/products") {
-    return json(await getProducts(env));
+    return json(await getProducts(env, businessId));
   }
 
   if (request.method === "POST" && pathname === "/api/products") {
@@ -388,16 +453,18 @@ async function productsApi(request, env, pathname) {
       return json({ error: "Data produk tidak valid" }, 400);
     }
     if (!validProductImage(gambar)) return json({ error: "Foto produk tidak valid atau terlalu besar" }, 400);
-    const duplicate = await env.DB.prepare("SELECT code FROM products WHERE barcode = ?").bind(barcode).first();
+    const duplicate = await env.DB.prepare(
+      "SELECT code FROM products WHERE business_id = ? AND barcode = ?"
+    ).bind(businessId, barcode).first();
     if (duplicate) return json({ error: "Barcode sudah digunakan produk lain" }, 409);
     const next = await env.DB.prepare(
-      "SELECT COALESCE(MAX(CAST(id AS INTEGER)), 0) + 1 AS nomor FROM products"
-    ).first();
+      "SELECT COALESCE(MAX(CAST(id AS INTEGER)), 0) + 1 AS nomor FROM products WHERE business_id = ?"
+    ).bind(businessId).first();
     const id = String(next.nomor);
     const code = `K${String(next.nomor).padStart(2, "0")}`;
     await env.DB.prepare(
-      "INSERT INTO products (id, code, barcode, name, category, price, stock, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-    ).bind(id, code, barcode, nama, kategori, harga, stock, gambar).run();
+      "INSERT INTO products (id, business_id, code, barcode, name, category, price, stock, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(id, businessId, code, barcode, nama, kategori, harga, stock, gambar).run();
     return json({ success: true, kode: code }, 201);
   }
 
@@ -419,18 +486,20 @@ async function productsApi(request, env, pathname) {
     }
     if (hasImage && !validProductImage(gambar)) return json({ error: "Foto produk tidak valid atau terlalu besar" }, 400);
     const duplicate = await env.DB.prepare(
-      "SELECT code FROM products WHERE barcode = ? AND code != ?"
-    ).bind(barcode, code).first();
+      "SELECT code FROM products WHERE business_id = ? AND barcode = ? AND code != ?"
+    ).bind(businessId, barcode, code).first();
     if (duplicate) return json({ error: "Barcode sudah digunakan produk lain" }, 409);
     const result = await env.DB.prepare(
-      "UPDATE products SET barcode = ?, name = ?, category = ?, price = ?, stock = ?, image = COALESCE(?, image) WHERE code = ?"
-    ).bind(barcode, nama, kategori, harga, stock, gambar, code).run();
+      "UPDATE products SET barcode = ?, name = ?, category = ?, price = ?, stock = ?, image = COALESCE(?, image) WHERE business_id = ? AND code = ?"
+    ).bind(barcode, nama, kategori, harga, stock, gambar, businessId, code).run();
     if (!result.meta.changes) return json({ error: "Produk tidak ditemukan" }, 404);
     return json({ success: true });
   }
 
   if (request.method === "DELETE") {
-    const result = await env.DB.prepare("DELETE FROM products WHERE code = ?").bind(code).run();
+    const result = await env.DB.prepare(
+      "DELETE FROM products WHERE business_id = ? AND code = ?"
+    ).bind(businessId, code).run();
     if (!result.meta.changes) return json({ error: "Produk tidak ditemukan" }, 404);
     return json({ success: true });
   }
@@ -438,8 +507,8 @@ async function productsApi(request, env, pathname) {
   return json({ error: "Method tidak didukung" }, 405);
 }
 
-async function transactionsApi(request, env) {
-  if (request.method === "GET") return json(await getTransactions(env));
+async function transactionsApi(request, env, businessId) {
+  if (request.method === "GET") return json(await getTransactions(env, businessId));
   if (request.method !== "POST") return json({ error: "Method tidak didukung" }, 405);
 
   const body = await request.json();
@@ -457,8 +526,8 @@ async function transactionsApi(request, env) {
       return json({ error: "Rincian keranjang tidak valid" }, 400);
     }
     const product = await env.DB.prepare(
-      "SELECT code, name, price, stock FROM products WHERE code = ?"
-    ).bind(code).first();
+      "SELECT code, name, price, stock FROM products WHERE business_id = ? AND code = ?"
+    ).bind(businessId, code).first();
     if (!product) return json({ error: `Produk ${code} tidak ditemukan` }, 404);
     if (product.stock < qty) return json({ error: `Stok ${product.name} tidak mencukupi` }, 409);
     verified.push({ ...product, qty });
@@ -478,15 +547,17 @@ async function transactionsApi(request, env) {
   const transactionId = `TRX-${crypto.randomUUID()}`;
   const statements = [
     env.DB.prepare(
-      "INSERT INTO transactions (id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).bind(transactionId, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member ? 1 : 0),
+      "INSERT INTO transactions (id, business_id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(transactionId, businessId, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member ? 1 : 0),
   ];
   for (const item of verified) {
     statements.push(
       env.DB.prepare(
         "INSERT INTO transaction_items (id, transaction_id, product_code, name, price, qty) VALUES (?, ?, ?, ?, ?, ?)"
       ).bind(`ITEM-${crypto.randomUUID()}`, transactionId, item.code, item.name, item.price, item.qty),
-      env.DB.prepare("UPDATE products SET stock = stock - ? WHERE code = ?").bind(item.qty, item.code)
+      env.DB.prepare(
+        "UPDATE products SET stock = stock - ? WHERE business_id = ? AND code = ?"
+      ).bind(item.qty, businessId, item.code)
     );
   }
   await env.DB.batch(statements);
@@ -507,13 +578,13 @@ async function transactionsApi(request, env) {
   }, 201);
 }
 
-async function smartInsightApi(env) {
+async function smartInsightApi(env, businessId) {
   const transactions = await env.DB.prepare(
-    "SELECT id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member FROM transactions ORDER BY waktu DESC"
-  ).all();
+    "SELECT id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member FROM transactions WHERE business_id = ? ORDER BY waktu DESC"
+  ).bind(businessId).all();
   const products = await env.DB.prepare(
-    "SELECT code, name, category, price, stock FROM products ORDER BY name"
-  ).all();
+    "SELECT code, name, category, price, stock FROM products WHERE business_id = ? ORDER BY name"
+  ).bind(businessId).all();
   const productMap = new Map((products.results || []).map((item) => [item.code, item]));
   const counts = new Map();
   const hours = new Map();
@@ -636,20 +707,21 @@ export default {
         if (!sessionSecretConfigured(env)) {
           return json({ error: AUTH_SETUP_MESSAGE }, 503);
         }
-        const profile = await getOrCreateOwnerProfile(env);
-        if (!profile) return json({ error: AUTH_SETUP_MESSAGE }, 503);
-        if (!await hasValidSession(request, env, profile)) {
+        await getOrCreateLegacyUser(env);
+        const user = await getSessionUser(request, env);
+        if (!user) {
           return json({ error: "Sesi login tidak valid. Silakan masuk kembali." }, 401);
         }
-      }
-      if (url.pathname === "/api/products" || url.pathname.startsWith("/api/products/")) {
-        return await productsApi(request, env, url.pathname);
-      }
-      if (url.pathname === "/api/transactions") {
-        return await transactionsApi(request, env);
-      }
-      if (url.pathname === "/api/smart-insight" && request.method === "POST") {
-        return await smartInsightApi(env);
+        if (url.pathname === "/api/products" || url.pathname.startsWith("/api/products/")) {
+          return await productsApi(request, env, url.pathname, user.business_id);
+        }
+        if (url.pathname === "/api/transactions") {
+          return await transactionsApi(request, env, user.business_id);
+        }
+        if (url.pathname === "/api/smart-insight" && request.method === "POST") {
+          return await smartInsightApi(env, user.business_id);
+        }
+        return json({ error: "Endpoint API tidak ditemukan" }, 404);
       }
       return await env.ASSETS.fetch(request);
     } catch (error) {

@@ -4,12 +4,14 @@ Panduan ini melengkapi halaman [Panduan Penggunaan di aplikasi](../src/panduan.h
 
 ## Login
 
-Masuk memakai akun pemilik yang disiapkan administrator. Tidak ada pendaftaran publik. Sesi berakhir setelah 12 jam; pilih **Keluar** melalui menu hamburger setelah selesai menggunakan perangkat bersama.
+Pilih **Daftar usaha** pada halaman login untuk membuat akun. Isi nama usaha, nama pengguna, nomor WhatsApp, dan password minimal 12 karakter. Setelah pendaftaran berhasil, Anda langsung masuk ke ruang data usaha tersebut. Nomor WhatsApp harus unik.
+
+Pengguna lama tetap memakai akun sebelumnya. Setelah migrasi database, masuk kembali karena sesi lama tidak berlaku. Sesi baru berakhir setelah 12 jam; pilih **Keluar** melalui menu hamburger setelah selesai menggunakan perangkat bersama.
 
 ## Mengubah profil
 
 1. Buka menu hamburger dan pilih **Profil**.
-2. Ubah nama pengguna atau pilih foto JPG, PNG, atau WebP. Foto maksimal 12 MB sebelum diperkecil otomatis.
+2. Nama usaha dan nomor WhatsApp ditampilkan sebagai informasi akun. Ubah nama pengguna atau pilih foto JPG, PNG, atau WebP. Foto maksimal 12 MB sebelum diperkecil otomatis.
 3. Untuk mengganti password, isi password saat ini, password baru minimal 12 karakter, dan konfirmasi password baru.
 4. Pilih **Simpan perubahan**. Perubahan username/password mengakhiri sesi pada perangkat lain.
 

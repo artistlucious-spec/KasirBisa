@@ -39,6 +39,8 @@ async function loadProfile() {
     if (!response.ok) throw new Error(data.error || "Profil tidak dapat dimuat.");
 
     profileUsername.value = data.username;
+    document.getElementById("profil-usaha").textContent = data.businessName;
+    document.getElementById("profil-whatsapp").textContent = data.whatsapp;
     savedProfileImage = data.profileImage || "";
     renderProfileImage(savedProfileImage, data.username);
     profileLoaded = true;

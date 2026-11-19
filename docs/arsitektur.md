@@ -26,13 +26,15 @@ Browser
 
 ## Autentikasi dan profil
 
-1. Login memeriksa username dan password terhadap profil pemilik di D1.
-2. Jika profil belum ada, backend membuatnya satu kali dari `KASIR_USERNAME` dan `KASIR_PASSWORD`, setelah tabel migrasi tersedia.
-3. Password disimpan sebagai hash PBKDF2-SHA-256 dengan salt acak dan 100.000 iterasi (batas Cloudflare Workers), bukan sebagai teks biasa.
-4. Sesi ditandatangani dengan `AUTH_SESSION_SECRET`, disimpan dalam cookie `HttpOnly`, dan berlaku 12 jam.
-5. Mengubah username atau password menaikkan versi sesi. Sesi pada perangkat lain menjadi tidak berlaku dan sesi aktif menerima cookie baru.
-6. Foto profil dikompres menjadi WebP di browser dan disimpan pada kolom `owner_profile.profile_image`.
+1. Pengguna mendaftar usaha dan akun. Login menerima nama pengguna atau nomor WhatsApp beserta password.
+2. Setiap akun terhubung ke satu usaha; seluruh API produk, transaksi, stok, dan insight membatasi kueri berdasarkan usaha pada sesi.
+3. Migrasi `0004_multi_tenant_accounts.sql` memindahkan data dan profil lama ke usaha `legacy-business`. Pengguna lama harus login kembali setelah migrasi karena format sesi berubah.
+4. Jika akun lama belum tersimpan, backend dapat membuatnya dari `KASIR_USERNAME` dan `KASIR_PASSWORD`.
+5. Password disimpan sebagai hash PBKDF2-SHA-256 dengan salt acak dan 100.000 iterasi (batas Cloudflare Workers), bukan sebagai teks biasa.
+6. Sesi ditandatangani dengan `AUTH_SESSION_SECRET`, menyertakan ID akun dan versi sesi, disimpan dalam cookie `HttpOnly`, dan berlaku 12 jam.
+7. Mengubah username atau password menaikkan versi sesi. Sesi pada perangkat lain menjadi tidak berlaku dan sesi aktif menerima cookie baru.
+8. Foto profil dikompres menjadi WebP di browser dan disimpan pada `users.profile_image`.
 
 ## Alur transaksi
 
-Browser mengirim kode produk dan jumlah barang. Backend memeriksa produk, stok, pembayaran, diskon, dan PPN berdasarkan data D1, lalu menyimpan transaksi, item, dan pengurangan stok melalui batch D1. Suara konfirmasi dimainkan di browser setelah server mengembalikan transaksi sukses.
+Browser mengirim kode produk dan jumlah barang. Backend memeriksa produk dan stok dalam ruang usaha pada sesi, menghitung pembayaran, diskon, dan PPN berdasarkan data D1, lalu menyimpan transaksi, item, dan pengurangan stok melalui batch D1. Suara konfirmasi dimainkan di browser setelah server mengembalikan transaksi sukses.

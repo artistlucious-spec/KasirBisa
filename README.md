@@ -24,13 +24,13 @@ Project Pages dan database D1 yang dipakai aplikasi bernama `kasirbisa`. Pastika
 
 Atur secrets di environment Cloudflare Pages yang digunakan:
 
-- `KASIR_USERNAME`: nama akun awal.
-- `KASIR_PASSWORD`: password akun awal, minimal 12 karakter.
 - `AUTH_SESSION_SECRET`: secret acak minimal 32 karakter.
+- `KASIR_USERNAME`: opsional, username akun lama jika perlu dibuat ulang.
+- `KASIR_PASSWORD`: opsional, password akun lama minimal 12 karakter jika perlu dibuat ulang.
 - `GEMINI_API_KEY`: opsional, untuk membuat analisis dengan Gemini.
 - `GEMINI_MODEL`: opsional; model default tersedia di `.dev.vars.example`.
 
-Jalankan `npm run d1:migrate:remote` untuk menerapkan migrasi ke D1 remote yang dikonfigurasi. Migrasi `0003_owner_profile.sql` diperlukan untuk halaman Profil. Pada penggunaan pertama, username dan password dari secrets membuat profil awal di D1; setelah itu perubahan profil/password dikelola dari halaman Profil.
+Pengguna baru dapat mendaftar melalui halaman **Daftar usaha**. Data setiap usaha dipisahkan di D1. Jalankan `npm run d1:migrate:remote` untuk menerapkan migrasi ke D1 remote yang dikonfigurasi; migrasi `0004_multi_tenant_accounts.sql` mempertahankan data lama di usaha legacy. Pengguna lama harus login kembali setelah migrasi.
 
 Deploy website Pages dengan `npm run deploy`. Secrets tidak dimasukkan ke source code atau dibagikan.
 

@@ -452,6 +452,11 @@ dialog h2 { margin: 0 0 18px; font-size: 20px; }
 #form-login label { margin-top: 5px; color: var(--ink); font-size: 13px; font-weight: 650; }
 #form-login input { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); }
 #form-login input:focus { outline: 2px solid #b8d9c9; border-color: var(--green); }
+#form-signup { display: grid; gap: 9px; }
+#form-signup label { margin-top: 5px; color: var(--ink); font-size: 13px; font-weight: 650; }
+#form-signup input { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); }
+#form-signup input:focus { outline: 2px solid #b8d9c9; border-color: var(--green); }
+#form-signup .primary-button { margin-top: 12px; }
 .password-field { display: flex; align-items: center; gap: 8px; }
 .password-field button { min-height: 42px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--green); cursor: pointer; font-size: 12px; font-weight: 650; }
 #form-login .primary-button { margin-top: 12px; }

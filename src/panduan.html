@@ -49,8 +49,8 @@
       <section id="login" class="guide-section">
         <p class="eyebrow">01 · AKSES</p>
         <h2>Login ke Kasir Bisa</h2>
-        <p>Masuk menggunakan nama pengguna atau nomor WhatsApp dan password akun pemilik. Demi keamanan, pendaftaran akun dari halaman login tidak tersedia. Sesi login berlaku hingga 12 jam; gunakan tombol <strong>Keluar</strong> setelah selesai menggunakan kasir.</p>
-        <p>Sebelum pertama kali memakai versi profil, administrator perlu menerapkan migrasi D1 terbaru dari folder project dengan <code>npm run d1:migrate:remote</code> ke database yang terhubung ke website. Untuk membuat akun awal, siapkan secret <code>KASIR_USERNAME</code>, <code>KASIR_PASSWORD</code> (minimal 12 karakter), dan <code>AUTH_SESSION_SECRET</code> (minimal 32 karakter acak) pada environment Cloudflare Pages yang digunakan. Jangan memasukkan nilai secret ke kode atau membagikannya.</p>
+        <p>Pilih <strong>Daftar usaha</strong> untuk membuat akun dengan nama usaha, nama pengguna, nomor WhatsApp, dan password minimal 12 karakter. Setiap usaha memiliki ruang data tersendiri. Sesi login berlaku hingga 12 jam; gunakan tombol <strong>Keluar</strong> setelah selesai menggunakan kasir.</p>
+        <p>Administrator perlu menerapkan migrasi D1 terbaru, termasuk <code>0004_multi_tenant_accounts.sql</code>, sebelum pendaftaran digunakan. Secret <code>AUTH_SESSION_SECRET</code> (minimal 32 karakter acak) wajib disiapkan pada environment Cloudflare Pages. Secret <code>KASIR_USERNAME</code> dan <code>KASIR_PASSWORD</code> hanya opsional untuk membuat ulang akun lama bila diperlukan. Pengguna lama harus login kembali setelah migrasi. Jangan memasukkan nilai secret ke kode atau membagikannya.</p>
       </section>
 
       <section id="profil" class="guide-section">
