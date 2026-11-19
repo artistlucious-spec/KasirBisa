@@ -164,6 +164,15 @@
         <label>Kategori<input id="produk-kategori" type="text" required></label>
         <label>Harga<input id="produk-harga" type="number" min="1" step="1" required></label>
         <label>Stok<input id="produk-stok" type="number" min="0" step="1" required></label>
+        <label class="product-image-field">Foto produk (opsional)
+          <input id="produk-gambar" type="file" accept="image/jpeg,image/png,image/webp">
+          <small>JPG, PNG, atau WebP. Foto otomatis diperkecil sebelum disimpan.</small>
+        </label>
+        <div id="produk-gambar-pratinjau" class="product-image-preview" hidden>
+          <img id="produk-gambar-img" alt="Pratinjau foto produk">
+          <button id="hapus-produk-gambar" class="secondary-button" type="button">Hapus foto</button>
+        </div>
+        <p id="produk-gambar-status" class="product-image-status" role="status" aria-live="polite"></p>
       </div>
       <div class="dialog-actions">
         <button id="batal-produk" class="secondary-button" type="button">Batal</button>

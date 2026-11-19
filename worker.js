@@ -1,8 +1,16 @@
+const MAX_PRODUCT_IMAGE_LENGTH = 140 * 1024;
+
 function json(data, status = 200) {
   return Response.json(data, {
     status,
     headers: { "Cache-Control": "no-store" },
   });
+}
+
+function validProductImage(image) {
+  return typeof image === "string"
+    && image.length <= MAX_PRODUCT_IMAGE_LENGTH
+    && (image === "" || /^data:image\/webp;base64,[A-Za-z0-9+/]+={0,2}$/.test(image));
 }
 
 function parseGeminiJson(text) {
@@ -76,9 +84,11 @@ async function productsApi(request, env, pathname) {
     const kategori = String(body.kategori || "").trim();
     const harga = Number(body.harga);
     const stock = Number(body.stock);
+    const gambar = Object.hasOwn(body, "gambar") ? body.gambar : "";
     if (!nama || !barcode || !kategori || !Number.isSafeInteger(harga) || harga <= 0 || !Number.isSafeInteger(stock) || stock < 0) {
       return json({ error: "Data produk tidak valid" }, 400);
     }
+    if (!validProductImage(gambar)) return json({ error: "Foto produk tidak valid atau terlalu besar" }, 400);
     const duplicate = await env.DB.prepare("SELECT code FROM products WHERE barcode = ?").bind(barcode).first();
     if (duplicate) return json({ error: "Barcode sudah digunakan produk lain" }, 409);
     const next = await env.DB.prepare(
@@ -87,8 +97,8 @@ async function productsApi(request, env, pathname) {
     const id = String(next.nomor);
     const code = `K${String(next.nomor).padStart(2, "0")}`;
     await env.DB.prepare(
-      "INSERT INTO products (id, code, barcode, name, category, price, stock, image) VALUES (?, ?, ?, ?, ?, ?, ?, '')"
-    ).bind(id, code, barcode, nama, kategori, harga, stock).run();
+      "INSERT INTO products (id, code, barcode, name, category, price, stock, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(id, code, barcode, nama, kategori, harga, stock, gambar).run();
     return json({ success: true, kode: code }, 201);
   }
 
@@ -103,16 +113,19 @@ async function productsApi(request, env, pathname) {
     const kategori = String(body.kategori || "").trim();
     const harga = Number(body.harga);
     const stock = Number(body.stock);
+    const hasImage = Object.hasOwn(body, "gambar");
+    const gambar = hasImage ? body.gambar : null;
     if (!nama || !barcode || !kategori || !Number.isSafeInteger(harga) || harga <= 0 || !Number.isSafeInteger(stock) || stock < 0) {
       return json({ error: "Data produk tidak valid" }, 400);
     }
+    if (hasImage && !validProductImage(gambar)) return json({ error: "Foto produk tidak valid atau terlalu besar" }, 400);
     const duplicate = await env.DB.prepare(
       "SELECT code FROM products WHERE barcode = ? AND code != ?"
     ).bind(barcode, code).first();
     if (duplicate) return json({ error: "Barcode sudah digunakan produk lain" }, 409);
     const result = await env.DB.prepare(
-      "UPDATE products SET barcode = ?, name = ?, category = ?, price = ?, stock = ? WHERE code = ?"
-    ).bind(barcode, nama, kategori, harga, stock, code).run();
+      "UPDATE products SET barcode = ?, name = ?, category = ?, price = ?, stock = ?, image = COALESCE(?, image) WHERE code = ?"
+    ).bind(barcode, nama, kategori, harga, stock, gambar, code).run();
     if (!result.meta.changes) return json({ error: "Produk tidak ditemukan" }, 404);
     return json({ success: true });
   }
@@ -277,7 +290,7 @@ async function smartInsightApi(env) {
     });
   }
 
-  const model = env.GEMINI_MODEL || "gemini-2.5-flash";
+  const model = env.GEMINI_MODEL || "gemini-3.8-flash";
   const prompt = `Anda adalah asisten analisis usaha Kasir Bisa untuk UMKM Indonesia.
 Jawab hanya berdasarkan data, gunakan bahasa Indonesia, dan kembalikan JSON valid dengan struktur:
 {"ringkasan":"...","produk_terlaris":"...","stok_menipis":"...","saran_penjualan":"...","jam_ramai":"...","kartu":[{"judul":"...","isi":"...","tipe":"success|warning|info"}]}

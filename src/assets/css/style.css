@@ -357,6 +357,14 @@ dialog h2 { margin: 0 0 18px; font-size: 20px; }
 .product-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .product-form-grid label { display: grid; gap: 6px; color: var(--ink); font-size: 12px; font-weight: 700; }
 .product-form-grid input { min-height: 42px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; }
+.product-form-grid .product-image-field, .product-image-preview, .product-image-status { grid-column: 1 / -1; }
+.product-form-grid .product-image-field input { min-height: auto; padding: 9px; }
+.product-image-field small { color: var(--muted); font-size: 11px; font-weight: 400; }
+.product-image-preview { display: flex; align-items: center; gap: 12px; }
+.product-image-preview[hidden] { display: none; }
+.product-image-preview img { width: 96px; height: 96px; border: 1px solid var(--line); border-radius: 10px; background: var(--canvas); object-fit: cover; }
+.product-image-preview .secondary-button { width: auto; margin: 0; padding: 8px 12px; }
+.product-image-status { min-height: 0; margin: -4px 0 0; color: var(--muted); font-size: 11px; }
 .image-unavailable { min-height: 112px; background: var(--green-light); }
 
 .halaman-rekap .site-header { min-height: 76px; }
