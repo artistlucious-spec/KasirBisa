@@ -9,4 +9,5 @@ Perubahan penting pada website dicatat di sini.
 - Mengakhiri sesi lain setelah username atau password diganti, sambil mempertahankan sesi perangkat aktif.
 - Mengganti navigasi halaman privat dengan menu hamburger yang juga bisa ditutup melalui klik di luar menu atau tombol Escape.
 - Menambahkan dokumentasi proyek untuk kebutuhan sistem, arsitektur, database, fitur, dan panduan pengguna.
-- Menyesuaikan binding D1 dengan database `kasir-bisa` dan menerapkan migrasi profil pemilik pada database remote.
+- Menyelaraskan perintah deploy dan migrasi D1 dengan project Pages `kasirbisa`.
+- Membatasi hash password PBKDF2 ke 100.000 iterasi agar sesuai dengan batas Cloudflare Workers.

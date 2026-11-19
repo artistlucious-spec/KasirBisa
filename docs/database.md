@@ -1,6 +1,6 @@
 # Database
 
-Kasir Bisa Web menggunakan Cloudflare D1 melalui binding `DB`. Konfigurasi database berada di `wrangler.toml`; nama database yang tercantum di konfigurasi adalah `kasir-bisa`.
+Kasir Bisa Web menggunakan Cloudflare D1 melalui binding `DB`. Konfigurasi database berada di `wrangler.toml`; nama database yang tercantum di konfigurasi adalah `kasirbisa`.
 
 ## Migrasi
 
@@ -8,7 +8,7 @@ Kasir Bisa Web menggunakan Cloudflare D1 melalui binding `DB`. Konfigurasi datab
 - `0002_seed_products.sql`: data awal produk contoh.
 - `0003_owner_profile.sql`: profil pemilik tunggal untuk login dan pengaturan akun.
 
-Jalankan `npm run d1:migrate:local` untuk D1 lokal. Jalankan `npm run d1:migrate:remote` hanya setelah memastikan akun Cloudflare dan database remote yang dikonfigurasi adalah milik website ini. Jangan menjalankan migrasi terhadap database lain.
+Jalankan `npm run d1:migrate:local` untuk D1 lokal. Jalankan `npm run d1:migrate:remote` hanya setelah memastikan akun Cloudflare dan database remote yang dikonfigurasi adalah milik project Pages `kasirbisa`. Jangan menjalankan migrasi terhadap database lain.
 
 ## Tabel
 

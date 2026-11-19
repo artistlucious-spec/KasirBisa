@@ -1,7 +1,7 @@
 const MAX_PRODUCT_IMAGE_LENGTH = 140 * 1024;
 const AUTH_COOKIE_NAME = "kasir_bisa_session";
 const AUTH_SESSION_SECONDS = 12 * 60 * 60;
-const PASSWORD_HASH_ITERATIONS = 310_000;
+const PASSWORD_HASH_ITERATIONS = 100_000;
 const AUTH_SETUP_MESSAGE = "Profil akun belum tersedia. Administrator perlu membuat secret KASIR_USERNAME, KASIR_PASSWORD, dan AUTH_SESSION_SECRET di Cloudflare lalu menerapkan migrasi D1 terbaru.";
 const textEncoder = new TextEncoder();
 const OWNER_PROFILE_SELECT = "SELECT username, password_hash, password_salt, password_iterations, profile_image, session_version FROM owner_profile WHERE id = 1";
@@ -78,7 +78,7 @@ async function verifyPassword(password, profile) {
     return false;
   }
   const iterations = Number(profile.password_iterations);
-  if (salt.length !== 16 || expectedHash.length !== 32 || !Number.isSafeInteger(iterations) || iterations < 100_000 || iterations > 1_000_000) {
+  if (salt.length !== 16 || expectedHash.length !== 32 || iterations !== PASSWORD_HASH_ITERATIONS) {
     return false;
   }
   const actualHash = await derivePasswordHash(password, salt, iterations);
