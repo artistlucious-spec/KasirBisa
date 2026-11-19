@@ -26,6 +26,10 @@ async function generateInsight() {
       body: "{}",
     });
     const data = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      window.location.replace("/login.html");
+      return;
+    }
     if (!response.ok && !data.insight) {
       throw new Error(data.detail || data.error || "Smart Insight tidak dapat diproses");
     }

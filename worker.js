@@ -1,10 +1,309 @@
 const MAX_PRODUCT_IMAGE_LENGTH = 140 * 1024;
+const AUTH_COOKIE_NAME = "kasir_bisa_session";
+const AUTH_SESSION_SECONDS = 12 * 60 * 60;
+const PASSWORD_HASH_ITERATIONS = 310_000;
+const AUTH_SETUP_MESSAGE = "Profil akun belum tersedia. Administrator perlu membuat secret KASIR_USERNAME, KASIR_PASSWORD, dan AUTH_SESSION_SECRET di Cloudflare lalu menerapkan migrasi D1 terbaru.";
+const textEncoder = new TextEncoder();
+const OWNER_PROFILE_SELECT = "SELECT username, password_hash, password_salt, password_iterations, profile_image, session_version FROM owner_profile WHERE id = 1";
 
-function json(data, status = 200) {
+function json(data, status = 200, extraHeaders = {}) {
   return Response.json(data, {
     status,
-    headers: { "Cache-Control": "no-store" },
+    headers: { "Cache-Control": "no-store", ...extraHeaders },
   });
+}
+
+function sessionSecretConfigured(env) {
+  return typeof env.AUTH_SESSION_SECRET === "string"
+    && env.AUTH_SESSION_SECRET.length >= 32;
+}
+
+function bootstrapCredentialsConfigured(env) {
+  return typeof env.KASIR_USERNAME === "string"
+    && env.KASIR_USERNAME.length > 0
+    && env.KASIR_USERNAME.length <= 128
+    && typeof env.KASIR_PASSWORD === "string"
+    && env.KASIR_PASSWORD.length >= 12
+    && env.KASIR_PASSWORD.length <= 256
+    && sessionSecretConfigured(env);
+}
+
+async function sameSecret(supplied, expected) {
+  const [suppliedHash, expectedHash] = await Promise.all([
+    crypto.subtle.digest("SHA-256", textEncoder.encode(supplied)),
+    crypto.subtle.digest("SHA-256", textEncoder.encode(expected)),
+  ]);
+  const suppliedBytes = new Uint8Array(suppliedHash);
+  const expectedBytes = new Uint8Array(expectedHash);
+  let difference = 0;
+  for (let index = 0; index < suppliedBytes.length; index += 1) {
+    difference |= suppliedBytes[index] ^ expectedBytes[index];
+  }
+  return difference === 0;
+}
+
+async function derivePasswordHash(password, salt, iterations) {
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    textEncoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  const hash = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+    keyMaterial,
+    256
+  );
+  return new Uint8Array(hash);
+}
+
+async function hashPassword(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const hash = await derivePasswordHash(password, salt, PASSWORD_HASH_ITERATIONS);
+  return {
+    hash: bytesToBase64Url(hash),
+    salt: bytesToBase64Url(salt),
+    iterations: PASSWORD_HASH_ITERATIONS,
+  };
+}
+
+async function verifyPassword(password, profile) {
+  let salt;
+  let expectedHash;
+  try {
+    salt = base64UrlToBytes(profile.password_salt);
+    expectedHash = base64UrlToBytes(profile.password_hash);
+  } catch {
+    return false;
+  }
+  const iterations = Number(profile.password_iterations);
+  if (salt.length !== 16 || expectedHash.length !== 32 || !Number.isSafeInteger(iterations) || iterations < 100_000 || iterations > 1_000_000) {
+    return false;
+  }
+  const actualHash = await derivePasswordHash(password, salt, iterations);
+  let difference = 0;
+  for (let index = 0; index < actualHash.length; index += 1) {
+    difference |= actualHash[index] ^ expectedHash[index];
+  }
+  return difference === 0;
+}
+
+async function getOwnerProfile(env) {
+  return env.DB.prepare(OWNER_PROFILE_SELECT).first();
+}
+
+async function getOrCreateOwnerProfile(env) {
+  let profile = await getOwnerProfile(env);
+  if (profile || !bootstrapCredentialsConfigured(env)) return profile;
+
+  const credentials = await hashPassword(env.KASIR_PASSWORD);
+  await env.DB.prepare(
+    "INSERT OR IGNORE INTO owner_profile (id, username, password_hash, password_salt, password_iterations) VALUES (1, ?, ?, ?, ?)"
+  ).bind(env.KASIR_USERNAME.trim(), credentials.hash, credentials.salt, credentials.iterations).run();
+  profile = await getOwnerProfile(env);
+  return profile;
+}
+
+function bytesToBase64Url(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+}
+
+function base64UrlToBytes(value) {
+  const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
+  const binary = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "="));
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+async function createSessionToken(secret, sessionVersion) {
+  const expiry = String(Math.floor(Date.now() / 1000) + AUTH_SESSION_SECONDS);
+  const version = String(sessionVersion);
+  const payload = `${expiry}.${version}`;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    textEncoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, textEncoder.encode(payload));
+  return `${payload}.${bytesToBase64Url(new Uint8Array(signature))}`;
+}
+
+async function hasValidSession(request, env, profile) {
+  if (!profile || !sessionSecretConfigured(env)) return false;
+  const cookie = (request.headers.get("Cookie") || "")
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${AUTH_COOKIE_NAME}=`));
+  if (!cookie) return false;
+
+  const token = cookie.slice(AUTH_COOKIE_NAME.length + 1);
+  const [expiry, version, encodedSignature, ...extraParts] = token.split(".");
+  if (
+    extraParts.length
+    || !/^\d{10,}$/.test(expiry)
+    || !/^\d+$/.test(version)
+    || version !== String(profile.session_version)
+    || Number(expiry) <= Math.floor(Date.now() / 1000)
+  ) {
+    return false;
+  }
+
+  let signature;
+  try {
+    signature = base64UrlToBytes(encodedSignature);
+  } catch {
+    return false;
+  }
+  if (signature.length !== 32) return false;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    textEncoder.encode(env.AUTH_SESSION_SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
+  return crypto.subtle.verify("HMAC", key, signature, textEncoder.encode(`${expiry}.${version}`));
+}
+
+function cookieHeaders(request, token, maxAge) {
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  return {
+    "Set-Cookie": `${AUTH_COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure}`,
+  };
+}
+
+async function parseJsonBody(request) {
+  try {
+    const body = await request.json();
+    return body && typeof body === "object" && !Array.isArray(body) ? body : null;
+  } catch {
+    return null;
+  }
+}
+
+async function authApi(request, env, pathname) {
+  const origin = request.headers.get("Origin");
+  if (request.method !== "GET" && origin && origin !== new URL(request.url).origin) {
+    return json({ error: "Permintaan lintas situs ditolak." }, 403);
+  }
+
+  if (pathname === "/api/auth/logout" && request.method === "POST") {
+    return json({ success: true }, 200, {
+      "Set-Cookie": `${AUTH_COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${new URL(request.url).protocol === "https:" ? "; Secure" : ""}`,
+    });
+  }
+
+  if (pathname === "/api/auth/login" && request.method === "POST") {
+    if (!sessionSecretConfigured(env)) {
+      return json({ error: AUTH_SETUP_MESSAGE }, 503);
+    }
+    const profile = await getOrCreateOwnerProfile(env);
+    if (!profile) return json({ error: AUTH_SETUP_MESSAGE }, 503);
+    const body = await parseJsonBody(request);
+    if (!body) {
+      return json({ error: "Format permintaan login tidak valid." }, 400);
+    }
+    const username = typeof body.username === "string" ? body.username.trim() : "";
+    const password = typeof body.password === "string" ? body.password : "";
+    if (username.length > 128 || password.length > 256 || !username || !password) {
+      return json({ error: "Nama pengguna atau password salah." }, 401);
+    }
+
+    const [usernameMatches, passwordMatches] = await Promise.all([
+      sameSecret(username, profile.username),
+      verifyPassword(password, profile),
+    ]);
+    if (!usernameMatches || !passwordMatches) {
+      return json({ error: "Nama pengguna atau password salah." }, 401);
+    }
+
+    const token = await createSessionToken(env.AUTH_SESSION_SECRET, profile.session_version);
+    return json({ success: true }, 200, cookieHeaders(request, token, AUTH_SESSION_SECONDS));
+  }
+
+  if (pathname === "/api/auth/session" && request.method === "GET") {
+    if (!sessionSecretConfigured(env)) {
+      return json({ authenticated: false, error: AUTH_SETUP_MESSAGE }, 503);
+    }
+    const profile = await getOrCreateOwnerProfile(env);
+    if (!profile) return json({ authenticated: false, error: AUTH_SETUP_MESSAGE }, 503);
+    return json({
+      authenticated: await hasValidSession(request, env, profile),
+    });
+  }
+
+  if (pathname === "/api/auth/profile" && ["GET", "PUT"].includes(request.method)) {
+    if (!sessionSecretConfigured(env)) {
+      return json({ error: AUTH_SETUP_MESSAGE }, 503);
+    }
+    const profile = await getOrCreateOwnerProfile(env);
+    if (!profile) return json({ error: AUTH_SETUP_MESSAGE }, 503);
+    if (!await hasValidSession(request, env, profile)) {
+      return json({ error: "Sesi login tidak valid. Silakan masuk kembali." }, 401);
+    }
+    if (request.method === "GET") {
+      return json({ username: profile.username, profileImage: profile.profile_image });
+    }
+
+    const body = await parseJsonBody(request);
+    if (!body) return json({ error: "Data profil tidak valid." }, 400);
+    const username = typeof body.username === "string" ? body.username.trim() : "";
+    const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
+    const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
+    const hasImage = Object.hasOwn(body, "profileImage");
+    const profileImage = hasImage ? body.profileImage : null;
+    if (!username || username.length > 128 || !currentPassword || currentPassword.length > 256) {
+      return json({ error: "Nama pengguna atau password saat ini tidak valid." }, 400);
+    }
+    if (newPassword && (newPassword.length < 12 || newPassword.length > 256)) {
+      return json({ error: "Password baru harus berisi 12 sampai 256 karakter." }, 400);
+    }
+    if (hasImage && !validProductImage(profileImage)) {
+      return json({ error: "Foto profil tidak valid atau terlalu besar." }, 400);
+    }
+    if (!await verifyPassword(currentPassword, profile)) {
+      return json({ error: "Password saat ini salah." }, 401);
+    }
+    if (!hasImage && !newPassword && username === profile.username) {
+      return json({ error: "Tidak ada perubahan untuk disimpan." }, 400);
+    }
+
+    const nextPassword = newPassword ? await hashPassword(newPassword) : {
+      hash: profile.password_hash,
+      salt: profile.password_salt,
+      iterations: profile.password_iterations,
+    };
+    const credentialsChanged = username !== profile.username || Boolean(newPassword);
+    const sessionVersion = Number(profile.session_version) + (credentialsChanged ? 1 : 0);
+    const result = await env.DB.prepare(
+      "UPDATE owner_profile SET username = ?, password_hash = ?, password_salt = ?, password_iterations = ?, profile_image = COALESCE(?, profile_image), session_version = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1"
+    ).bind(
+      username,
+      nextPassword.hash,
+      nextPassword.salt,
+      nextPassword.iterations,
+      profileImage,
+      sessionVersion
+    ).run();
+    if (!result.meta.changes) return json({ error: "Profil tidak ditemukan." }, 404);
+
+    const headers = credentialsChanged
+      ? cookieHeaders(request, await createSessionToken(env.AUTH_SESSION_SECRET, sessionVersion), AUTH_SESSION_SECONDS)
+      : {};
+    return json({
+      success: true,
+      profile: {
+        username,
+        profileImage: hasImage ? profileImage : profile.profile_image,
+      },
+    }, 200, headers);
+  }
+
+  return json({ error: "Endpoint autentikasi tidak ditemukan." }, 404);
 }
 
 function validProductImage(image) {
@@ -330,6 +629,19 @@ export default {
   async fetch(request, env, context) {
     const url = new URL(request.url);
     try {
+      if (url.pathname.startsWith("/api/auth/")) {
+        return await authApi(request, env, url.pathname);
+      }
+      if (url.pathname.startsWith("/api/")) {
+        if (!sessionSecretConfigured(env)) {
+          return json({ error: AUTH_SETUP_MESSAGE }, 503);
+        }
+        const profile = await getOrCreateOwnerProfile(env);
+        if (!profile) return json({ error: AUTH_SETUP_MESSAGE }, 503);
+        if (!await hasValidSession(request, env, profile)) {
+          return json({ error: "Sesi login tidak valid. Silakan masuk kembali." }, 401);
+        }
+      }
       if (url.pathname === "/api/products" || url.pathname.startsWith("/api/products/")) {
         return await productsApi(request, env, url.pathname);
       }

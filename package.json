@@ -5,8 +5,9 @@
     "build": "node -e \"console.log('No framework build step: static files are in src/')\"",
     "deploy": "wrangler pages deploy src --project-name kasir-bisa",
     "dev": "wrangler pages dev src",
-    "d1:migrate": "wrangler d1 migrations apply kasir-bisa",
-    "d1:migrate:local": "wrangler d1 migrations apply kasir-bisa --local"
+    "d1:migrate": "wrangler d1 migrations apply kasirbisa",
+    "d1:migrate:local": "wrangler d1 migrations apply kasirbisa --local",
+    "d1:migrate:remote": "wrangler d1 migrations apply kasirbisa --remote"
   },
   "devDependencies": {
     "wrangler": "^4.165.0"

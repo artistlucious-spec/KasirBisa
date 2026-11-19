@@ -46,53 +46,6 @@ function tampilkanPratinjauGambar(gambar) {
   else img.removeAttribute("src");
 }
 
-function blobKeDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      if (typeof reader.result === "string") resolve(reader.result);
-      else reject(new Error("Foto tidak dapat dibaca."));
-    }, { once: true });
-    reader.addEventListener("error", () => reject(new Error("Foto tidak dapat dibaca.")), { once: true });
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function kompresFotoProduk(file) {
-  const tipeDiizinkan = ["image/jpeg", "image/png", "image/webp"];
-  if (!tipeDiizinkan.includes(file.type)) {
-    throw new Error("Pilih foto berformat JPG, PNG, atau WebP.");
-  }
-  if (file.size > 12 * 1024 * 1024) {
-    throw new Error("Ukuran foto asli maksimal 12 MB.");
-  }
-
-  const bitmap = await createImageBitmap(file);
-  try {
-    const skalaAwal = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Foto tidak dapat diproses di browser ini.");
-
-    for (const pengaliUkuran of [1, 0.8, 0.65]) {
-      canvas.width = Math.max(1, Math.round(bitmap.width * skalaAwal * pengaliUkuran));
-      canvas.height = Math.max(1, Math.round(bitmap.height * skalaAwal * pengaliUkuran));
-      context.fillStyle = "#fff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-
-      for (const kualitas of [0.8, 0.68, 0.55]) {
-        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", kualitas));
-        if (!blob) throw new Error("Foto tidak dapat dikompres.");
-        if (blob.size <= 100 * 1024) return await blobKeDataUrl(blob);
-      }
-    }
-  } finally {
-    bitmap.close();
-  }
-  throw new Error("Foto terlalu besar setelah dikompres. Coba pilih foto lain.");
-}
-
 function renderProduk() {
   const daftar = KasirLogic.saringProduk(KasirLogic.daftarProduk(), elPencarian.value, elKategori.value);
   elProduk.replaceChildren();
@@ -261,12 +214,26 @@ function isiRincian(target, transaksi) {
   );
 }
 
+async function putarSuaraTransaksiSukses() {
+  const audio = document.getElementById("suara-transaksi-sukses");
+  if (!audio) return false;
+
+  try {
+    audio.currentTime = 0;
+    await audio.play();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function requestApi(url, options = {}) {
   const response = await fetch(url, {
     ...options,
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
   });
   const data = await response.json().catch(() => ({ error: "Respons server tidak valid" }));
+  if (response.status === 401) window.location.replace("/login.html");
   if (!response.ok) throw new Error(data.error || "Permintaan ke database gagal");
   return data;
 }
@@ -449,7 +416,13 @@ async function konfirmasiPembayaran() {
     document.getElementById("langkah-konfirmasi").hidden = true;
     document.getElementById("langkah-struk").hidden = false;
     await Promise.all([muatProduk(), muatTransaksi()]);
-    tampilkanPesan("Pembayaran berhasil dan transaksi tersimpan.", "success");
+    const suaraDiputar = await putarSuaraTransaksiSukses();
+    tampilkanPesan(
+      suaraDiputar
+        ? "Pembayaran berhasil dan transaksi tersimpan."
+        : "Pembayaran berhasil, tetapi suara notifikasi tidak dapat diputar.",
+      "success"
+    );
     render();
   } catch (error) {
     tampilkanPesan(`Transaksi tidak dapat disimpan: ${error.message}`, "error");
@@ -554,7 +527,7 @@ document.getElementById("produk-gambar").addEventListener("change", async (event
   tombolSimpan.disabled = true;
   status.textContent = "Memperkecil foto...";
   try {
-    gambarProdukPerubahan = await kompresFotoProduk(file);
+    gambarProdukPerubahan = await KasirImageUtils.kompresKeWebp(file);
     tampilkanPratinjauGambar(gambarProdukPerubahan);
     status.textContent = `Foto siap disimpan (${Math.ceil(file.size / 1024)} KB asli).`;
   } catch (error) {

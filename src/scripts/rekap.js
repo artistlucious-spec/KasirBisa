@@ -203,6 +203,7 @@ function mulaiRekap() {
   fetch("/api/transactions", { headers: { "Accept": "application/json" } })
     .then(async (response) => {
       const data = await response.json().catch(() => ({ error: "Respons server tidak valid" }));
+      if (response.status === 401) window.location.replace("/login.html");
       if (!response.ok) throw new Error(data.error || "Database transaksi tidak dapat dibaca");
       transaksiTersimpan = Array.isArray(data) ? data : [];
       isiPilihanProduk(transaksiTersimpan);

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1565c0">
   <title>Smart Insight - Kasir Bisa</title>
+  <script src="scripts/auth-guard.js"></script>
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body class="halaman-insight">
@@ -13,11 +14,16 @@
       <span class="brand-mark" aria-hidden="true">KB</span>
       <span><strong>Kasir Bisa</strong><small>Kasir kantin sederhana</small></span>
     </a>
-    <nav class="header-nav" aria-label="Navigasi utama">
+    <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Buka menu" aria-controls="site-menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <nav id="site-menu" class="header-nav" aria-label="Navigasi utama" hidden>
       <a class="header-link" href="index.html">Kasir</a>
       <a class="header-link" href="rekap.html">Rekap</a>
       <a class="header-link active" href="smart-insight.html">Smart Insight</a>
       <a class="header-link" href="panduan.html">Panduan</a>
+      <a class="header-link" href="profile.html">Profil</a>
+      <button id="tombol-keluar" class="header-link logout-button" type="button">Keluar</button>
     </nav>
   </header>
 
@@ -74,6 +80,7 @@
     </section>
   </main>
 
+  <script src="scripts/navigation.js"></script>
   <script src="scripts/smart-insight.js"></script>
 </body>
 </html>

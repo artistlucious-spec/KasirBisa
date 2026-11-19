@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1565c0">
   <title>Panduan Penggunaan - Kasir Bisa</title>
+  <script src="scripts/auth-guard.js"></script>
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body class="halaman-panduan">
@@ -13,11 +14,16 @@
       <span class="brand-mark" aria-hidden="true">KB</span>
       <span><strong>Kasir Bisa</strong><small>Kasir kantin sederhana</small></span>
     </a>
-    <nav class="header-nav" aria-label="Navigasi utama">
+    <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Buka menu" aria-controls="site-menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <nav id="site-menu" class="header-nav" aria-label="Navigasi utama" hidden>
       <a class="header-link" href="index.html">Kasir</a>
       <a class="header-link" href="rekap.html">Rekap</a>
       <a class="header-link" href="smart-insight.html">Smart Insight</a>
       <a class="header-link active" href="panduan.html">Panduan</a>
+      <a class="header-link" href="profile.html">Profil</a>
+      <button id="tombol-keluar" class="header-link logout-button" type="button">Keluar</button>
     </nav>
   </header>
 
@@ -30,6 +36,8 @@
     </section>
 
     <nav class="guide-index" aria-label="Daftar isi panduan">
+      <a href="#login">Login</a>
+      <a href="#profil">Profil</a>
       <a href="#katalog">Katalog produk</a>
       <a href="#transaksi">Transaksi</a>
       <a href="#rekap">Rekap</a>
@@ -38,8 +46,26 @@
     </nav>
 
     <div class="guide-content">
+      <section id="login" class="guide-section">
+        <p class="eyebrow">01 · AKSES</p>
+        <h2>Login ke Kasir Bisa</h2>
+        <p>Masuk menggunakan nama pengguna atau nomor WhatsApp dan password akun pemilik. Demi keamanan, pendaftaran akun dari halaman login tidak tersedia. Sesi login berlaku hingga 12 jam; gunakan tombol <strong>Keluar</strong> setelah selesai menggunakan kasir.</p>
+        <p>Sebelum pertama kali memakai versi profil, administrator perlu menerapkan migrasi D1 terbaru dari folder project dengan <code>npm run d1:migrate:remote</code> ke database yang terhubung ke website. Untuk membuat akun awal, siapkan secret <code>KASIR_USERNAME</code>, <code>KASIR_PASSWORD</code> (minimal 12 karakter), dan <code>AUTH_SESSION_SECRET</code> (minimal 32 karakter acak) pada environment Cloudflare Pages yang digunakan. Jangan memasukkan nilai secret ke kode atau membagikannya.</p>
+      </section>
+
+      <section id="profil" class="guide-section">
+        <p class="eyebrow">02 · AKUN</p>
+        <h2>Mengubah profil dan password</h2>
+        <ol>
+          <li>Buka menu hamburger (ikon tiga garis) lalu pilih <strong>Profil</strong>.</li>
+          <li>Ubah nama pengguna atau pilih foto profil. Foto JPG, PNG, atau WebP akan diperkecil otomatis.</li>
+          <li>Untuk mengganti password, isi password saat ini, password baru minimal 12 karakter, lalu ulangi password baru.</li>
+          <li>Tekan <strong>Simpan perubahan</strong>. Sesi login pada perangkat lain akan berakhir jika nama pengguna atau password berubah.</li>
+        </ol>
+      </section>
+
       <section id="katalog" class="guide-section">
-        <p class="eyebrow">01 · PERSIAPAN</p>
+        <p class="eyebrow">03 · PERSIAPAN</p>
         <h2>Mengelola katalog produk</h2>
         <ol>
           <li>Di halaman <a href="index.html">Kasir</a>, tekan <strong>Tambah produk</strong>.</li>
@@ -52,7 +78,7 @@
       </section>
 
       <section id="transaksi" class="guide-section">
-        <p class="eyebrow">02 · PENJUALAN</p>
+        <p class="eyebrow">04 · PENJUALAN</p>
         <h2>Mencatat transaksi</h2>
         <ol>
           <li>Pindai barcode dengan kamera, atau ketik barcode di kolom pemindai lalu tekan <strong>Cari</strong>. Jika kamera tidak tersedia atau izinnya ditolak, gunakan cara ketik.</li>
@@ -60,12 +86,12 @@
           <li>Periksa isi keranjang. Sesuaikan jumlah dengan tombol tambah/kurang atau keluarkan barang yang tidak jadi dibeli.</li>
           <li>Jika pelanggan terdaftar sebagai member, centang <strong>Pelanggan member</strong>. Member mendapat diskon 10%. Non-member mendapat diskon 5% jika subtotal minimal Rp100.000.</li>
           <li>Masukkan uang yang diterima atau pilih nominal cepat. PPN 11% dihitung setelah diskon; jumlah pembayaran harus cukup untuk menutup total.</li>
-          <li>Tekan <strong>Bayar</strong>, periksa ringkasan, lalu tekan <strong>Konfirmasi &amp; bayar</strong>. Stok akan berkurang setelah transaksi berhasil disimpan.</li>
+          <li>Tekan <strong>Bayar</strong>, periksa ringkasan, lalu tekan <strong>Konfirmasi &amp; bayar</strong>. Stok akan berkurang setelah transaksi berhasil disimpan dan suara konfirmasi akan diputar.</li>
         </ol>
       </section>
 
       <section id="rekap" class="guide-section">
-        <p class="eyebrow">03 · LAPORAN</p>
+        <p class="eyebrow">05 · LAPORAN</p>
         <h2>Melihat dan mengunduh rekap</h2>
         <ol>
           <li>Buka halaman <a href="rekap.html">Rekap</a> dari navigasi.</li>
@@ -76,14 +102,14 @@
       </section>
 
       <section id="smart-insight" class="guide-section">
-        <p class="eyebrow">04 · ANALISIS</p>
+        <p class="eyebrow">06 · ANALISIS</p>
         <h2>Menggunakan Smart Insight</h2>
         <p>Buka <a href="smart-insight.html">Smart Insight</a> untuk melihat ringkasan transaksi, produk terlaris, stok menipis, jam ramai, dan saran penjualan. Tekan <strong>Buat insight baru</strong> untuk memperbarui analisis.</p>
         <p>Jika analisis gagal, data ringkasan yang tersedia tetap dapat ditampilkan. Pengaturan Gemini merupakan tugas administrator; jangan memasukkan atau membagikan API key di halaman kasir.</p>
       </section>
 
       <section id="kendala" class="guide-section">
-        <p class="eyebrow">05 · PEMECAHAN MASALAH</p>
+        <p class="eyebrow">07 · PEMECAHAN MASALAH</p>
         <h2>Jika mengalami kendala</h2>
         <ul>
           <li><strong>Kamera tidak dapat digunakan:</strong> izinkan akses kamera di browser atau ketik barcode secara manual.</li>
@@ -95,5 +121,6 @@
       </section>
     </div>
   </main>
+  <script src="scripts/navigation.js"></script>
 </body>
 </html>

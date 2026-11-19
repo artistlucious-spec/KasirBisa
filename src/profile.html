@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1565c0">
+  <title>Profil - Kasir Bisa</title>
+  <script src="scripts/auth-guard.js"></script>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="halaman-profil">
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Kasir Bisa, kembali ke kasir">
+      <span class="brand-mark" aria-hidden="true">KB</span>
+      <span><strong>Kasir Bisa</strong><small>Kasir kantin sederhana</small></span>
+    </a>
+    <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Buka menu" aria-controls="site-menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <nav id="site-menu" class="header-nav" aria-label="Navigasi utama" hidden>
+      <a class="header-link" href="index.html">Kasir</a>
+      <a class="header-link" href="rekap.html">Rekap</a>
+      <a class="header-link" href="smart-insight.html">Smart Insight</a>
+      <a class="header-link" href="panduan.html">Panduan</a>
+      <a class="header-link active" href="profile.html">Profil</a>
+      <button id="tombol-keluar" class="header-link logout-button" type="button">Keluar</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="profile-page-heading">
+      <p class="eyebrow">AKUN PEMILIK</p>
+      <h1>Profil</h1>
+      <p>Perbarui nama pengguna, password, dan foto profil akun Kasir Bisa.</p>
+    </section>
+
+    <section class="profile-card" aria-labelledby="profile-form-title">
+      <form id="form-profil">
+        <h2 id="profile-form-title">Informasi akun</h2>
+        <div class="profile-photo-row">
+          <div class="profile-avatar">
+            <img id="foto-profil-pratinjau" alt="Foto profil" hidden>
+            <span id="inisial-profil" aria-hidden="true">KB</span>
+          </div>
+          <div class="profile-photo-input">
+            <label for="foto-profil">Foto profil</label>
+            <input id="foto-profil" type="file" accept="image/jpeg,image/png,image/webp">
+            <small>JPG, PNG, atau WebP. Maksimal 12 MB; foto diperkecil otomatis.</small>
+            <button id="hapus-foto-profil" class="secondary-button" type="button" hidden>Hapus foto</button>
+          </div>
+        </div>
+
+        <div class="profile-fields">
+          <label for="profil-username">Nama pengguna / nomor WhatsApp
+            <input id="profil-username" type="text" autocomplete="username" maxlength="128" required>
+          </label>
+          <label for="password-saat-ini">Password saat ini
+            <input id="password-saat-ini" type="password" autocomplete="current-password" maxlength="256" required>
+          </label>
+          <label for="password-baru">Password baru (opsional, minimal 12 karakter)
+            <input id="password-baru" type="password" autocomplete="new-password" minlength="12" maxlength="256">
+          </label>
+          <label for="konfirmasi-password-baru">Ulangi password baru
+            <input id="konfirmasi-password-baru" type="password" autocomplete="new-password" minlength="12" maxlength="256">
+          </label>
+        </div>
+
+        <p id="status-profil" class="profile-status" role="status" aria-live="polite"></p>
+        <button id="simpan-profil" class="primary-button" type="submit" disabled>Simpan perubahan</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="scripts/navigation.js"></script>
+  <script src="scripts/image-utils.js"></script>
+  <script src="scripts/profile.js"></script>
+</body>
+</html>
