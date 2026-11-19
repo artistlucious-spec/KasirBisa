@@ -12,6 +12,7 @@ const elKeranjang = document.getElementById("daftar-keranjang");
 const elBayar = document.getElementById("bayar");
 const elMember = document.getElementById("member");
 const elDialog = document.getElementById("dialog-transaksi");
+const PLACEHOLDER_GAMBAR_PRODUK = "assets/images/placeholder-produk.png";
 
 function rupiah(angka) {
   return "Rp" + Number(angka).toLocaleString("id-ID");
@@ -30,6 +31,26 @@ function tampilkanPesan(teks, jenis = "") {
   pesan.className = "notice" + (jenis ? " " + jenis : "");
 }
 
+function aturGambarProduk(img, gambar, namaProduk) {
+  const punyaFoto = Boolean(gambar);
+  img.dataset.placeholder = String(!punyaFoto);
+  img.classList.remove("image-unavailable");
+  img.alt = punyaFoto ? namaProduk : `Belum ada foto untuk ${namaProduk}`;
+  img.src = gambar || PLACEHOLDER_GAMBAR_PRODUK;
+  img.onerror = () => {
+    if (img.dataset.placeholder === "true") {
+      img.removeAttribute("src");
+      img.alt = "Gambar produk tidak tersedia";
+      img.classList.add("image-unavailable");
+      return;
+    }
+
+    img.dataset.placeholder = "true";
+    img.alt = `Belum ada foto untuk ${namaProduk}`;
+    img.src = PLACEHOLDER_GAMBAR_PRODUK;
+  };
+}
+
 function isiKategori() {
   const kategori = [...new Set(KasirLogic.daftarProduk().map((produk) => produk.kategori))]
     .sort((a, b) => a.localeCompare(b, "id-ID"));
@@ -42,8 +63,11 @@ function tampilkanPratinjauGambar(gambar) {
   const pratinjau = document.getElementById("produk-gambar-pratinjau");
   const img = document.getElementById("produk-gambar-img");
   pratinjau.hidden = !gambar;
-  if (gambar) img.src = gambar;
-  else img.removeAttribute("src");
+  if (gambar) aturGambarProduk(img, gambar, "Foto produk");
+  else {
+    img.removeAttribute("src");
+    img.onerror = null;
+  }
 }
 
 function renderProduk() {
@@ -58,14 +82,8 @@ function renderProduk() {
   for (const produk of daftar) {
     const kartu = elemen("article", "product-card");
     const gambar = document.createElement("img");
-    gambar.src = produk.gambar;
-    gambar.alt = produk.nama;
     gambar.loading = "lazy";
-    gambar.addEventListener("error", () => {
-      gambar.removeAttribute("src");
-      gambar.alt = "Gambar tidak tersedia";
-      gambar.classList.add("image-unavailable");
-    }, { once: true });
+    aturGambarProduk(gambar, produk.gambar, produk.nama);
 
     const info = elemen("div", "product-info");
     info.append(
@@ -103,13 +121,9 @@ function renderKeranjang() {
     const baris = elemen("article", "cart-item");
     const gambar = document.createElement("img");
     gambar.className = "cart-item-image";
-    gambar.src = item.gambar;
-    gambar.alt = "";
     gambar.setAttribute("aria-hidden", "true");
     gambar.loading = "lazy";
-    gambar.addEventListener("error", () => {
-      gambar.hidden = true;
-    }, { once: true });
+    aturGambarProduk(gambar, item.gambar, item.nama);
 
     const rincian = elemen("div", "cart-item-detail");
     rincian.append(
