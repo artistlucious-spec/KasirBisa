@@ -47,6 +47,13 @@ button { -webkit-tap-highlight-color: transparent; }
   font-size: 15px;
   font-weight: 800;
 }
+.brand-logo {
+  width: 42px;
+  height: 42px;
+  display: block;
+  object-fit: cover;
+  border-radius: 13px;
+}
 .brand strong, .brand small { display: block; }
 .brand strong { font-size: 16px; }
 .brand small { margin-top: 3px; color: var(--muted); font-size: 12px; }
