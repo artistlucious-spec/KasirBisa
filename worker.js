@@ -296,7 +296,17 @@ DATA: ${JSON.stringify(facts)}`;
     }
   );
   if (!response.ok) {
-    return json({ success: false, message: "Gemini tidak dapat menghasilkan insight.", facts, insight: fallback }, 502);
+    const providerError = await response.json().catch(() => ({}));
+    const providerMessage = String(
+      providerError.error?.message || response.statusText || "Gemini menolak permintaan."
+    ).replaceAll(env.GEMINI_API_KEY, "[API key disembunyikan]").slice(0, 400);
+    return json({
+      success: false,
+      error: "Gemini API menolak permintaan",
+      detail: `HTTP ${response.status}: ${providerMessage}`,
+      facts,
+      insight: fallback,
+    }, 502);
   }
   const gemini = await response.json();
   const text = gemini.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("") || "";

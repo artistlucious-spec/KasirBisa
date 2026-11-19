@@ -25,8 +25,10 @@ async function generateInsight() {
       headers: { "Content-Type": "application/json" },
       body: "{}",
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Smart Insight tidak dapat diproses");
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok && !data.insight) {
+      throw new Error(data.detail || data.error || "Smart Insight tidak dapat diproses");
+    }
 
     const insight = data.insight || {};
     document.getElementById("insight-ringkasan").innerHTML =
@@ -70,7 +72,10 @@ async function generateInsight() {
     } else if (data.success) {
       setNotice("Insight berhasil dibuat dari data penjualan dan stok.", "success");
     } else {
-      setNotice("Insight fallback ditampilkan karena Gemini tidak dapat dipanggil.", "error");
+      setNotice(
+        data.detail || data.error || "Insight cadangan ditampilkan karena Gemini tidak dapat dipanggil.",
+        "error"
+      );
     }
   } catch (error) {
     keyArea.hidden = true;
