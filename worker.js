@@ -386,6 +386,18 @@ function parseGeminiJson(text) {
   }
 }
 
+function geminiErrorMessage(status) {
+  const messages = {
+    400: "Permintaan analisis ditolak oleh layanan AI.",
+    401: "Layanan AI belum dapat diakses. Pengelola perlu memeriksa API key.",
+    403: "Akses ke layanan AI ditolak. Pengelola perlu memeriksa izin API key.",
+    404: "Model AI tidak ditemukan. Pengelola perlu memeriksa konfigurasi model.",
+    429: "Batas penggunaan layanan AI tercapai. Coba lagi nanti.",
+    503: "Layanan AI sedang sibuk atau mengalami gangguan sementara. Coba lagi beberapa saat.",
+  };
+  return messages[status] || `Layanan AI mengalami kendala (HTTP ${status}). Coba lagi nanti.`;
+}
+
 function rupiah(value) {
   return `Rp${Number(value || 0).toLocaleString("id-ID")}`;
 }
@@ -679,14 +691,10 @@ DATA: ${JSON.stringify(facts)}`;
     }
   );
   if (!response.ok) {
-    const providerError = await response.json().catch(() => ({}));
-    const providerMessage = String(
-      providerError.error?.message || response.statusText || "Gemini menolak permintaan."
-    ).replaceAll(env.GEMINI_API_KEY, "[API key disembunyikan]").slice(0, 400);
     return json({
       success: false,
       error: "Gemini API menolak permintaan",
-      detail: `HTTP ${response.status}: ${providerMessage}`,
+      detail: `${geminiErrorMessage(response.status)} Insight cadangan tetap ditampilkan.`,
       facts,
       insight: fallback,
     }, 502);
