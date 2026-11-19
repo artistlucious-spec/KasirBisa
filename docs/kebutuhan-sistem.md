@@ -21,7 +21,7 @@
 - Secret `KASIR_USERNAME` dan `KASIR_PASSWORD` (minimal 12 karakter) untuk membuat akun pemilik pertama kali jika baris profil belum tersedia.
 - `GEMINI_API_KEY` hanya diperlukan untuk membuat insight dengan Gemini; ringkasan dasar dihitung dari data D1.
 
-Database harus menerapkan semua file migrasi dalam `migrations/`, termasuk `0003_owner_profile.sql`, sebelum halaman Profil digunakan. Pastikan migrasi remote menyasar database `kasirbisa` dan project Cloudflare Pages `kasir-bisa` yang benar.
+Database harus menerapkan semua file migrasi dalam `migrations/`, termasuk `0003_owner_profile.sql`, sebelum halaman Profil digunakan. Pastikan migrasi remote menyasar database `kasir-bisa` dan project Cloudflare Pages `kasir-bisa` yang benar.
 
 ## Batasan unggah foto
 
