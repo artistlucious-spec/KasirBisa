@@ -370,6 +370,30 @@ dialog h2 { margin: 0 0 18px; font-size: 20px; }
 .halaman-rekap .site-header { min-height: 76px; }
 
 .halaman-insight main { max-width: 1180px; }
+.halaman-panduan main { max-width: 1000px; }
+.guide-hero {
+  margin-bottom: 16px;
+  padding: 28px;
+  border-radius: 16px;
+  background: linear-gradient(120deg, #0d4f9e, #2586dc);
+  color: #fff;
+}
+.guide-hero .eyebrow { color: #cfe4ff; }
+.guide-hero h1 { margin: 0 0 8px; font-size: clamp(24px, 4vw, 34px); }
+.guide-hero p:not(.eyebrow) { max-width: 680px; margin: 0 0 18px; color: #e8f2ff; line-height: 1.6; }
+.guide-action { display: inline-flex; align-items: center; min-height: 40px; padding: 9px 14px; border-radius: 8px; background: #fff; color: var(--green-dark); font-size: 13px; font-weight: 700; }
+.guide-action:hover { text-decoration: none; background: #e8f2ff; }
+.guide-index { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.guide-index a { padding: 7px 10px; border-radius: 7px; background: var(--green-light); font-size: 12px; font-weight: 650; }
+.guide-content { display: grid; gap: 14px; }
+.guide-section { scroll-margin-top: 16px; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.guide-section .eyebrow { margin-bottom: 7px; }
+.guide-section h2 { margin: 0 0 12px; font-size: 19px; }
+.guide-section p, .guide-section li { color: #40566d; font-size: 14px; line-height: 1.7; }
+.guide-section p { margin: 10px 0 0; }
+.guide-section ol, .guide-section ul { display: grid; gap: 8px; margin: 0; padding-left: 22px; }
+.guide-section li::marker { color: var(--green); font-weight: 700; }
+.guide-section a { font-weight: 650; }
 .insight-hero {
   display: flex;
   align-items: center;
@@ -496,4 +520,6 @@ dialog h2 { margin: 0 0 18px; font-size: 20px; }
   .product-form-grid { grid-template-columns: 1fr; }
   .insight-card-grid, .insight-facts { grid-template-columns: 1fr; }
   .header-nav { flex-wrap: wrap; justify-content: flex-end; }
+  .site-header { flex-wrap: wrap; }
+  .header-nav { flex: 1 1 100%; justify-content: space-between; }
 }
