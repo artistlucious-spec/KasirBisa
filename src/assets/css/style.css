@@ -1,3 +1,4 @@
+/* Variabel tema dan aturan dasar yang dipakai bersama oleh semua halaman. */
 :root {
   --green: #1565c0;
   --green-dark: #0d4f9e;
@@ -23,6 +24,7 @@ a { color: var(--green); text-decoration: none; }
 a:hover { text-decoration: underline; }
 button { -webkit-tap-highlight-color: transparent; }
 
+/* Header aplikasi dan navigasi halaman privat. */
 .site-header {
   position: relative;
   min-height: 76px;
@@ -102,6 +104,7 @@ main { width: min(1280px, 100%); margin: 0 auto; padding: 28px 24px 52px; }
 }
 .notice.success { color: var(--green); }
 
+/* Layout dua kolom untuk panel katalog dan checkout pada layar lebar. */
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
@@ -267,6 +270,7 @@ dialog h2 { margin: 0 0 18px; font-size: 20px; }
 .dialog-actions .secondary-button { margin: 0; }
 #langkah-struk > .primary-button { margin-top: 16px; }
 
+/* Tabel transaksi dan kontrol pencarian/filter pada halaman rekap. */
 .halaman-rekap main { max-width: 1100px; }
 .halaman-rekap .table-scroll { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
 .halaman-rekap table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 14px; }
@@ -327,7 +331,7 @@ dialog h2 { margin: 0 0 18px; font-size: 20px; }
   .history-item { align-items: flex-start; flex-direction: column; gap: 7px; }
 }
 
-/* Layout transaksi utama ala aplikasi Kasir Bisa */
+/* Menu halaman dan panel scanner/transaksi pada halaman kasir. */
 .header-nav {
   position: absolute;
   top: calc(100% + 4px);
@@ -405,6 +409,7 @@ dialog h2 { margin: 0 0 18px; font-size: 20px; }
 
 .halaman-insight main { max-width: 1180px; }
 .halaman-panduan main { max-width: 1000px; }
+/* Tampilan halaman panduan, profil, login, dan insight. */
 .guide-hero {
   margin-bottom: 16px;
   padding: 28px;

@@ -1,3 +1,4 @@
+// Mengatur buka/tutup menu, termasuk klik di luar menu dan tombol Escape.
 const menuButton = document.getElementById("menu-toggle");
 const siteMenu = document.getElementById("site-menu");
 

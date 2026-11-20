@@ -1,3 +1,4 @@
+// Pengendali halaman kasir: menghubungkan elemen HTML, KasirLogic, dan API server.
 let keranjang = [];
 let transaksiTersimpan = [];
 let transaksiMenunggu = null;
@@ -242,6 +243,7 @@ async function putarSuaraTransaksiSukses() {
 }
 
 async function requestApi(url, options = {}) {
+  // Semua akses database melewati API; sesi yang habis kembali ke halaman login.
   const response = await fetch(url, {
     ...options,
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -415,6 +417,7 @@ async function konfirmasiPembayaran() {
     return;
   }
   try {
+    // Server memeriksa ulang harga/stok dan menyimpan transaksi sebelum keranjang dikosongkan.
     const hasil = await requestApi("/api/transactions", {
       method: "POST",
       body: JSON.stringify({

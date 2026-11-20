@@ -1,3 +1,4 @@
+-- Migrasi pertama: membuat tabel katalog dan transaksi untuk satu ruang data.
 CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY,
   code TEXT NOT NULL UNIQUE,

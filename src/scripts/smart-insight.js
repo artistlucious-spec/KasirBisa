@@ -1,3 +1,4 @@
+// Meminta ringkasan insight dan fakta penjualan dari API, lalu mengisi kartu halaman.
 const button = document.getElementById("buat-insight");
 const notice = document.getElementById("insight-notice");
 const keyArea = document.getElementById("api-key-area");
@@ -93,6 +94,7 @@ async function generateInsight() {
 }
 
 function escapeHtml(text) {
+  // Teks dari AI diperlakukan sebagai teks biasa, bukan markup yang dipercaya.
   const div = document.createElement("div");
   div.textContent = String(text);
   return div.innerHTML;

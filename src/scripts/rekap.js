@@ -1,3 +1,4 @@
+// Menampilkan transaksi tersimpan, menyediakan pencarian/filter, dan mengekspor CSV.
 function rupiah(angka) {
   return "Rp" + Number(angka).toLocaleString("id-ID");
 }
@@ -119,6 +120,7 @@ function renderRekap(transaksiTersimpan, pesanError) {
 
 function selCsv(nilai) {
   let teks = String(nilai ?? "");
+  // Awalan formula spreadsheet dijadikan teks agar isi CSV tidak dijalankan sebagai rumus.
   if (/^[=+\-@\t\r]/.test(teks)) teks = "'" + teks;
   return '"' + teks.replace(/"/g, '""') + '"';
 }

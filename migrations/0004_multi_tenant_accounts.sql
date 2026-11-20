@@ -1,3 +1,5 @@
+-- Migrasi akun tunggal menjadi beberapa usaha tanpa memindahkan data lama keluar.
+-- Buat akun legacy, salin profil, lalu bangun ulang tabel data dengan business_id.
 CREATE TABLE businesses (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,

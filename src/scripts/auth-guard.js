@@ -1,3 +1,4 @@
+// Menahan halaman privat sampai server memastikan cookie sesi masih sah.
 document.documentElement.classList.add("auth-pending");
 window.addEventListener("pageshow", (event) => {
   if (event.persisted) window.location.reload();

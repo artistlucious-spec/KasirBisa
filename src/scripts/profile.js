@@ -1,3 +1,4 @@
+// Mengelola profil, foto, dan pergantian password melalui API.
 const profileForm = document.getElementById("form-profil");
 const profileUsername = document.getElementById("profil-username");
 const profileImageInput = document.getElementById("foto-profil");
@@ -60,6 +61,7 @@ function setSavedPasswordVisible(isVisible) {
 }
 
 function setPasswordMode(isEnabled) {
+  // Perubahan username dan password dipisah agar verifikasi password saat ini tidak ambigu.
   passwordToggle.setAttribute("aria-expanded", String(isEnabled));
   passwordFields.hidden = !isEnabled;
   profileUsernameField.hidden = isEnabled;

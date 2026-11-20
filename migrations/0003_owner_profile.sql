@@ -1,3 +1,4 @@
+-- Skema profil pemilik versi awal; migrasi 0004 memindahkannya ke tabel users.
 CREATE TABLE IF NOT EXISTS owner_profile (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   username TEXT NOT NULL,

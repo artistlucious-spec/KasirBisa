@@ -1,3 +1,4 @@
+// Backend bersama untuk semua route Pages: autentikasi, produk, transaksi, dan insight.
 const MAX_PRODUCT_IMAGE_LENGTH = 140 * 1024;
 const AUTH_COOKIE_NAME = "kasir_bisa_session";
 const AUTH_SESSION_SECONDS = 12 * 60 * 60;
@@ -122,6 +123,7 @@ async function verifyPassword(password, profile) {
     return false;
   }
   const actualHash = await derivePasswordHash(password, salt, iterations);
+  // Bandingkan seluruh byte agar hasil tidak bergantung pada posisi byte yang berbeda.
   let difference = 0;
   for (let index = 0; index < actualHash.length; index += 1) {
     difference |= actualHash[index] ^ expectedHash[index];
@@ -165,6 +167,7 @@ function base64UrlToBytes(value) {
 }
 
 async function createSessionToken(secret, userId, sessionVersion) {
+  // Cookie hanya memuat identitas, masa berlaku, dan versi sesi yang ditandatangani HMAC.
   const expiry = String(Math.floor(Date.now() / 1000) + AUTH_SESSION_SECONDS);
   const version = String(sessionVersion);
   const payload = `${userId}.${expiry}.${version}`;
@@ -180,6 +183,7 @@ async function createSessionToken(secret, userId, sessionVersion) {
 }
 
 async function getSessionUser(request, env) {
+  // Setiap request privat memverifikasi tanda tangan dan versi sesi yang masih berlaku.
   if (!sessionSecretConfigured(env)) return null;
   const cookie = (request.headers.get("Cookie") || "")
     .split(";")
@@ -242,6 +246,7 @@ async function parseJsonBody(request) {
 }
 
 async function authApi(request, env, pathname) {
+  // Satu handler menangani seluruh URL /api/auth/* setelah pemeriksaan origin.
   const origin = request.headers.get("Origin");
   if (request.method !== "GET" && origin && origin !== new URL(request.url).origin) {
     return json({ error: "Permintaan lintas situs ditolak." }, 403);
@@ -276,6 +281,7 @@ async function authApi(request, env, pathname) {
       return json({ error: "Periksa kembali nama usaha, nama pengguna, WhatsApp, dan password (12–256 karakter)." }, 400);
     }
 
+    // Pemeriksaan awal memberi pesan ramah; indeks unik database tetap menjadi penjaga terakhir.
     const existing = await env.DB.prepare(
       "SELECT id FROM users WHERE username = ? COLLATE NOCASE OR whatsapp = ?"
     ).bind(username, whatsapp).first();
@@ -453,6 +459,7 @@ async function authApi(request, env, pathname) {
 }
 
 function validProductImage(image) {
+  // Gambar yang disimpan di D1 dibatasi ke data URL WebP kecil hasil kompresi browser.
   return typeof image === "string"
     && image.length <= MAX_PRODUCT_IMAGE_LENGTH
     && (image === "" || /^data:image\/webp;base64,[A-Za-z0-9+/]+={0,2}$/.test(image));
@@ -601,6 +608,7 @@ async function productsApi(request, env, pathname, businessId) {
 }
 
 async function transactionsApi(request, env, businessId) {
+  // Semua pembacaan dan penulisan riwayat dibatasi pada usaha dari sesi aktif.
   if (request.method === "GET") return json(await getTransactions(env, businessId));
   if (request.method !== "POST") return json({ error: "Method tidak didukung" }, 405);
 
@@ -611,6 +619,7 @@ async function transactionsApi(request, env, businessId) {
   if (!items.length) return json({ error: "Keranjang masih kosong" }, 400);
   if (!Number.isSafeInteger(dibayar) || dibayar < 0) return json({ error: "Jumlah pembayaran tidak valid" }, 400);
 
+  // Ambil ulang harga dan stok dari D1; data harga/total dari browser tidak dipercaya.
   const verified = [];
   for (const item of items) {
     const code = String(item.kode || "");
@@ -653,6 +662,7 @@ async function transactionsApi(request, env, businessId) {
       ).bind(item.qty, businessId, item.code)
     );
   }
+  // Simpan transaksi, item, dan pengurangan stok bersama-sama agar checkout konsisten.
   await env.DB.batch(statements);
   return json({
     success: true,
@@ -672,6 +682,7 @@ async function transactionsApi(request, env, businessId) {
 }
 
 async function smartInsightApi(env, businessId) {
+  // Fakta dihitung dari database usaha ini; model AI hanya menerima ringkasan agregat.
   const transactions = await env.DB.prepare(
     "SELECT id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member FROM transactions WHERE business_id = ? ORDER BY waktu DESC"
   ).bind(businessId).all();
@@ -742,6 +753,7 @@ async function smartInsightApi(env, businessId) {
     { judul: "Jam Ramai", isi: busyHours.length ? `${String(busyHours[0].hour).padStart(2, "0")}:00` : "Belum tersedia", tipe: "info" },
   ];
 
+  // Ringkasan dasar tetap tersedia tanpa layanan eksternal atau API key Gemini.
   if (!env.GEMINI_API_KEY) {
     return json({
       success: false,
@@ -789,6 +801,7 @@ export default {
   async fetch(request, env, context) {
     const url = new URL(request.url);
     try {
+      // Route Pages meneruskan request ke sini; permintaan non-API dilayani sebagai aset statis.
       if (url.pathname.startsWith("/api/auth/")) {
         return await authApi(request, env, url.pathname);
       }

@@ -51,4 +51,6 @@ Deploy website Pages dengan `npm run deploy`. Secrets tidak dimasukkan ke source
 - [Database](docs/database.md)
 - [Fitur](docs/fitur.md)
 - [Panduan pengguna](docs/panduan-pengguna.md)
+- [Informasi penting sebelum menjalankan](Note/info%20penting.md)
+- [Panduan proyek untuk guru dan AI](Note/penjelasan.md)
 - [Panduan dalam aplikasi](src/panduan.html)

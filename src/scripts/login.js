@@ -1,3 +1,4 @@
+// Mengirim kredensial ke API login dan menampilkan statusnya pada halaman.
 const form = document.getElementById("form-login");
 const usernameInput = document.getElementById("nama-pengguna");
 const passwordInput = document.getElementById("kata-sandi");

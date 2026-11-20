@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- Halaman privat utama: pemindai barcode, keranjang, pembayaran, dan katalog. -->
 <html lang="id">
 <head>
   <meta charset="utf-8">
@@ -10,6 +11,7 @@
   <link rel="icon" type="image/png" href="icon/Favicon.png">
 </head>
 <body>
+  <!-- Navigasi bersama halaman yang memerlukan sesi login. -->
   <header class="site-header">
     <a class="brand" href="index.html" aria-label="Kasir Bisa, halaman kasir">
       <img class="brand-logo" src="icon/Favicon.png" alt="" aria-hidden="true">
@@ -31,6 +33,7 @@
   <main>
     <div id="pesan" class="notice" role="status" aria-live="polite"></div>
 
+    <!-- Area transaksi langsung: kamera/barcode, keranjang, dan pembayaran. -->
     <section class="transaction-section" aria-labelledby="transaction-title">
       <div class="transaction-heading">
         <div>
@@ -119,6 +122,7 @@
       </div>
     </section>
 
+    <!-- Katalog produk juga menjadi pintu untuk mengedit dan menghapus produk. -->
     <section class="catalog-panel" aria-labelledby="catalog-title">
         <div class="section-heading">
           <div><p class="eyebrow">KATALOG</p><h2 id="catalog-title">Pilih produk</h2></div>
@@ -195,6 +199,7 @@
   </dialog>
 
   <audio id="suara-transaksi-sukses" src="assets/sfx/buy.mp3" preload="auto"></audio>
+  <!-- Urutan penting: logika domain dan utilitas gambar harus ada sebelum app.js. -->
   <script src="scripts/kasir.js"></script>
   <script src="scripts/image-utils.js"></script>
   <script src="scripts/app.js"></script>

@@ -1,0 +1,43 @@
+# Log Aktivitas Kasir Bisa
+
+- 2026-11-19: Mengubah rencana menjadi migrasi tampilan aplikasi Flutter Kasir Bisa ke aplikasi web dalam folder `kasir bisa web`.
+- 2026-11-19: Memindahkan area transaksi utama ke bagian atas website dan katalog pengelolaan manual ke bagian bawah.
+- 2026-11-19: Mengganti identitas visual utama dari hijau menjadi biru (`#1565c0`) agar mengikuti desain aplikasi Flutter.
+- 2026-11-19: Menambahkan pemindai kamera dan input barcode manual pada halaman kasir.
+- 2026-11-19: Menambahkan pengelolaan katalog produk (tambah, edit, hapus, harga, stok, barcode, dan kategori).
+- 2026-11-19: Menyimpan data katalog dan riwayat transaksi melalui `localStorage` browser.
+- 2026-11-19: Menambahkan pengecekan dan pengurangan stok saat transaksi berhasil.
+- 2026-11-19: Menyesuaikan header halaman rekap agar konsisten dengan halaman kasir.
+- 2026-11-19: Memvalidasi sintaks JavaScript halaman kasir, katalog, transaksi, dan rekap dengan `node --check`.
+- 2026-11-19: Menjalankan website lokal pada `http://127.0.0.1:4173` dan menguji alur scan barcode manual, keranjang, pembayaran, pengurangan stok, serta tampilan rekap.
+- 2026-11-19: Menambahkan schema Cloudflare D1 untuk produk, transaksi, dan item transaksi beserta data produk awal.
+- 2026-11-19: Menghubungkan katalog, transaksi, stok, dan rekap website ke Pages Functions.
+- 2026-11-19: Menerapkan migrasi D1 pada database lokal dan menguji endpoint produk serta transaksi.
+- 2026-11-19: Membuat database Cloudflare D1 baru bernama `kasir-bisa` karena UUID sebelumnya tidak terdaftar pada akun yang terautentikasi.
+- 2026-11-19: Merapikan aset ke `src/assets/` dan JavaScript ke `src/scripts/`.
+- 2026-11-19: Membuat database D1 remote baru bernama `kasir-bisa` dengan ID `6676ee36-dbb3-448e-b99c-27ca0684e9fa`.
+- 2026-11-19: Menerapkan kedua migrasi D1 ke database remote dan menguji transaksi di Cloudflare.
+- 2026-11-19: Membuat project Cloudflare Pages `kasir-bisa` dan melakukan deploy produksi.
+- 2026-11-19: Website D1 aktif di `https://kasir-bisa.pages.dev/`.
+- 2026-11-19: Menambahkan halaman terpisah `smart-insight.html` beserta CSS dan JavaScript khusus.
+- 2026-11-19: Menambahkan endpoint Cloudflare `/api/smart-insight` yang menghitung produk terlaris, stok menipis, jam ramai, dan saran penjualan dari D1.
+- 2026-11-19: Menyiapkan integrasi Gemini melalui secret Cloudflare `GEMINI_API_KEY`; API key tidak disimpan di HTML atau JavaScript.
+- 2026-11-19: Menyiapkan `.dev.vars.example` sebagai contoh konfigurasi lokal dan `.gitignore` untuk melindungi secret lokal.
+- 2026-11-19: Menentukan penyebab error Cloudflare Git: dashboard menjalankan `npx wrangler deploy` untuk proyek Pages, padahal deploy harus menggunakan Pages atau integrasi Git Pages.
+- 2026-11-19: Menambahkan script `build` dan `deploy` ke `package.json` agar opsi GitHub Cloudflare dapat memakai output `src` dan perintah Pages yang benar.
+- 2026-11-19: Mengoreksi arsitektur menjadi Cloudflare Worker: menambahkan `worker.js`, static assets melalui binding `ASSETS`, dan D1 melalui binding `DB`.
+- 2026-11-19: Memindahkan seluruh endpoint produk, transaksi, dan Smart Insight dari Pages Functions ke Worker agar deployment GitHub menggunakan `npx wrangler deploy`.
+- 2026-11-19: Mengubah konfigurasi [wrangler.toml](kasir%20bisa%20web/wrangler.toml) menjadi Cloudflare Worker dengan assets dan D1.
+- 2026-11-19: Menghapus Pages Functions lama dan memindahkan seluruh API ke [worker.js](kasir%20bisa%20web/worker.js).
+- 2026-11-19: Worker berhasil di-deploy ke `https://kasir-bisa.ibraiking97windows.workers.dev`.
+- 2026-11-19: Mengembalikan target hosting ke Cloudflare Pages: `pages_build_output_dir = "./src"`, `wrangler pages dev`, dan `wrangler pages deploy`.
+- 2026-11-19: Menambahkan Pages Functions route adapters untuk produk, transaksi, dan Smart Insight; handler API bersama tetap terpakai dari `worker.js`.
+- 2026-11-19: Menguji Pages lokal dan production; static site, D1, produk, transaksi, serta Smart Insight API berhasil diakses.
+- 2026-11-19: Memperbaiki penanganan kegagalan Gemini agar respons menampilkan detail error provider tanpa membocorkan API key dan insight fallback tetap terlihat.
+- 2026-11-19: Memasang `src/icon/Favicon.png` pada header halaman kasir dengan ukuran 42×42 px agar sesuai area logo yang sudah ada; favicon tab browser tetap digunakan.
+- 2026-11-19: Memvalidasi bahwa aset logo tersedia, markup header mengarah ke file yang benar, ukuran CSS 42×42 px, dan link favicon tetap aktif; aset sumber berukuran 48×48 px.
+- 2026-11-19: Memperluas pemasangan ikon dari halaman kasir ke seluruh halaman HTML (`index`, `rekap`, `smart-insight`, `panduan`, `profile`, `login`, dan `signup`) agar identitas logo konsisten.
+- 2026-11-19: Memvalidasi seluruh 7 file HTML di `src`; semuanya memakai ikon header baru dan tidak ada lagi mark teks `KB`.
+- 2026-11-19: Memeriksa situs live `https://e2d6929d.kasirbisa.pages.dev/`; HTML produksi halaman kasir, login, dan daftar masih menyajikan `<span class="brand-mark">KB</span>`, sedangkan URL ikon `/icon/Favicon.png` merespons 200.
+- 2026-11-19: Menemukan akar masalah deployment: `wrangler.toml` GitHub menetapkan `pages_build_output_dir = "./src"`, tetapi file HTML di `src/` GitHub masih memakai mark teks `KB`; salinan HTML pada root repo berbeda dan sudah memakai gambar. Perubahan lokal di `kasir bisa web/src` belum terkirim ke GitHub.
+- 2026-11-19: Tidak melakukan push/deploy karena GitHub CLI pada sesi ini tidak terautentikasi; perubahan lokal perlu dipush ke folder `src/` yang menjadi output Cloudflare Pages.

@@ -1,3 +1,4 @@
+// Memeriksa foto dan mengecilkannya menjadi WebP sebelum dikirim ke API.
 (function (global) {
   function blobKeDataUrl(blob) {
     return new Promise((resolve, reject) => {
@@ -26,6 +27,7 @@
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Foto tidak dapat diproses di browser ini.");
 
+      // Coba beberapa ukuran dan kualitas supaya data URL muat dalam batas API/D1.
       for (const pengaliUkuran of [1, 0.8, 0.65]) {
         canvas.width = Math.max(1, Math.round(bitmap.width * skalaAwal * pengaliUkuran));
         canvas.height = Math.max(1, Math.round(bitmap.height * skalaAwal * pengaliUkuran));

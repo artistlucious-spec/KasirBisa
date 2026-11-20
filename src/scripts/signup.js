@@ -1,3 +1,4 @@
+// Memeriksa konfirmasi password di browser lalu mendaftarkan akun melalui API.
 const form = document.getElementById("form-signup");
 const submitButton = document.getElementById("tombol-daftar");
 const message = document.getElementById("pesan-daftar");

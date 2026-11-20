@@ -1,7 +1,10 @@
+# Cloudflare Pages menyajikan file website statis langsung dari folder ini.
 name = "kasirbisa"
 pages_build_output_dir = "./src"
+# Tanggal kompatibilitas menentukan perilaku runtime Workers yang digunakan.
 compatibility_date = "2026-11-19"
 
+# Binding DB dipakai worker.js untuk semua query Cloudflare D1.
 [[d1_databases]]
 binding = "DB"
 database_name = "kasirbisa"

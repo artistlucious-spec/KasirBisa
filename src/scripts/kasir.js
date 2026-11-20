@@ -1,3 +1,5 @@
+// Logika domain kasir di browser: katalog, keranjang, harga, dan ringkasan transaksi.
+// Worker menghitung ulang nilai checkout sebelum transaksi disimpan ke database.
 (function (global) {
   const MENU = [
     { kode: "K01", id: 1, nama: "Nasi kuning", kategori: "Makanan", harga: 8000, stock: 30, barcode: "899100100001", gambar: "assets/images/nasikuning.png" },
@@ -119,6 +121,7 @@
   }
 
   function hitungDiskon(subtotal, member) {
+    // Aturan yang sama diterapkan kembali oleh worker sebelum transaksi disimpan.
     if (member) {
       return Math.floor((subtotal * 10 + 50) / 100);
     }
@@ -129,6 +132,7 @@
   }
 
   function hitungPPN(dasarPajak) {
+    // PPN 11% dihitung dari nilai setelah diskon.
     return Math.floor((dasarPajak * 11 + 50) / 100);
   }
 

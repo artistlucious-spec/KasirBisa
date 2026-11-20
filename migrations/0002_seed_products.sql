@@ -1,3 +1,4 @@
+-- Data contoh awal; INSERT OR IGNORE mencegah duplikasi saat baris sudah tersedia.
 INSERT OR IGNORE INTO products (id, code, barcode, name, category, price, stock, image) VALUES
   ('1', 'K01', '899100100001', 'Nasi kuning', 'Makanan', 8000, 30, 'assets/images/nasikuning.png'),
   ('2', 'K02', '899100100002', 'Air Mineral', 'Minuman', 5000, 50, 'assets/images/mineral.png'),
