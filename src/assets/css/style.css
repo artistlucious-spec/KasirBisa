@@ -606,6 +606,10 @@ dialog h2 { margin: 0 0 18px; font-size: 20px; }
   .transaction-heading h1 { font-size: 22px; }
   .sales-stats { gap: 10px; }
   .sales-stats div { min-width: 92px; }
+  .barcode-form { grid-template-columns: minmax(0, 1fr) 52px; }
+  .barcode-form input { min-width: 0; }
+  .barcode-form .search-button { width: 52px; min-width: 52px; min-height: 48px; }
+  .barcode-form .search-button svg { display: block; flex: none; width: 22px; height: 22px; }
   .checkout-panel { grid-template-columns: 1fr; }
   .catalog-meta { flex-direction: column; }
   .header-nav .header-link { font-size: 13px; }
@@ -617,7 +621,6 @@ dialog h2 { margin: 0 0 18px; font-size: 20px; }
 @media (max-width: 420px) {
   .transaction-heading { flex-direction: column; }
   .camera-frame { height: 220px; }
-  .barcode-form { grid-template-columns: 1fr 72px; }
   .catalog-add { font-size: 11px; }
   .product-form-grid { grid-template-columns: 1fr; }
   .insight-card-grid, .insight-facts { grid-template-columns: 1fr; }
