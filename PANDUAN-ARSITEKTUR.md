@@ -385,11 +385,9 @@ Migrasi database perlu dijalankan pada database yang benar sebelum fitur yang me
 
 Catatan pemeriksaan produksi sebelumnya menemukan perbedaan target:
 
-- D1 produksi Pages `kasirbisa` yang dipakai saat perbaikan pendaftaran: nama `kasirbisa`, ID `520d3b0f-e730-4a12-ad88-7b68afffce83`.
-- [`wrangler.toml`](./wrangler.toml) saat diperiksa menunjuk D1 bernama `kasir-bisa`, ID `6676ee36-dbb3-448e-b99c-27ca0684e9fa`.
-- Skrip `d1:migrate:remote` di [`package.json`](./package.json) memakai nama D1 `kasir-bisa`.
-
-Itu dua target berbeda. Karena itu, **jangan menjalankan `npm run d1:migrate:remote` sebelum memastikan konfigurasi menunjuk database produksi yang benar**. Membaca panduan ini tidak menjalankan migrasi atau deploy apa pun. Pemeriksaan sebelumnya juga mencatat bahwa signup produksi berhasil diuji setelah migrasi; deploy GitHub tidak dilakukan sebagai bagian dari perbaikan tersebut.
+- Wrangler sebelumnya menunjuk D1 bernama `kasir-bisa`, ID `6676ee36-dbb3-448e-b99c-27ca0684e9fa`, yang tidak ditemukan saat deploy.
+- Database D1 yang dikonfirmasi untuk aplikasi bernama `kasirbisa`, ID `520d3b0f-e730-4a12-ad88-7b68afffce83`. Konfigurasi dan skrip migrasi sekarang menunjuk ke database tersebut.
+- Status migrasi remote menunjukkan hanya `0005_password_encrypted.sql` yang masih menunggu. **Terapkan migrasi tersebut sebelum memakai fitur tampilan password.** Tidak ada migrasi atau deploy remote yang dijalankan dalam perbaikan konfigurasi ini.
 
 ### Secret
 

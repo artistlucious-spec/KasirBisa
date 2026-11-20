@@ -5,5 +5,5 @@ compatibility_date = "2026-11-19"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "kasir-bisa"
-database_id = "6676ee36-dbb3-448e-b99c-27ca0684e9fa"
+database_name = "kasirbisa"
+database_id = "520d3b0f-e730-4a12-ad88-7b68afffce83"

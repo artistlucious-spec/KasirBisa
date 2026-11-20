@@ -1,6 +1,6 @@
 # Database
 
-Kasir Bisa Web menggunakan Cloudflare D1 melalui binding `DB`. Konfigurasi database berada di `wrangler.toml`; nama database yang tercantum di konfigurasi adalah `kasir-bisa`.
+Kasir Bisa Web menggunakan Cloudflare D1 melalui binding `DB`. Konfigurasi database berada di `wrangler.toml`; nama database yang tercantum di konfigurasi adalah `kasirbisa`.
 
 ## Migrasi
 

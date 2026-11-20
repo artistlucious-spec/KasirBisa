@@ -20,7 +20,7 @@ Build statis dapat diperiksa dengan `npm run build`. Untuk pemeriksaan sintaks J
 
 ## Konfigurasi Cloudflare
 
-Project Pages bernama `kasirbisa`; database D1 yang dipakai aplikasi bernama `kasir-bisa`. Pastikan Wrangler menggunakan akun Cloudflare yang sama dengan project Pages sebelum menjalankan perintah remote.
+Project Pages dan database D1 yang dipakai aplikasi bernama `kasirbisa`. Pastikan Wrangler menggunakan akun Cloudflare yang sama dengan project Pages sebelum menjalankan perintah remote.
 
 Atur secrets di environment Cloudflare Pages yang digunakan:
 
