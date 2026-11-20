@@ -329,6 +329,7 @@ async function nyalakanKamera() {
     const video = document.getElementById("kamera");
     video.srcObject = mediaStream;
     await video.play();
+    document.querySelector(".camera-frame").classList.add("camera-active");
     document.getElementById("kamera-belum-aktif").classList.add("hidden");
     document.getElementById("tombol-kamera").textContent = "Matikan kamera";
     if ("BarcodeDetector" in window) {
@@ -348,6 +349,7 @@ function matikanKamera() {
   if (mediaStream) mediaStream.getTracks().forEach((track) => track.stop());
   mediaStream = null;
   document.getElementById("kamera").srcObject = null;
+  document.querySelector(".camera-frame").classList.remove("camera-active");
   document.getElementById("kamera-belum-aktif").classList.remove("hidden");
   document.getElementById("tombol-kamera").textContent = "Nyalakan kamera";
 }
