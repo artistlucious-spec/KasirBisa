@@ -44,21 +44,23 @@
         <button type="button" id="reset-filter">Hapus filter</button>
         <button type="button" id="unduh-csv">Unduh CSV</button>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Waktu</th>
-            <th>Produk</th>
-            <th class="angka">Subtotal</th>
-            <th class="angka">Diskon</th>
-            <th class="angka">PPN</th>
-            <th class="angka">Total</th>
-            <th class="angka">Dibayar</th>
-            <th class="angka">Kembalian</th>
-          </tr>
-        </thead>
-        <tbody id="rekap-transaksi"></tbody>
-      </table>
+      <div class="table-scroll" role="region" aria-label="Tabel rekap transaksi, geser ke samping untuk melihat kolom lainnya" tabindex="0">
+        <table>
+          <thead>
+            <tr>
+              <th>Waktu</th>
+              <th>Produk</th>
+              <th class="angka">Subtotal</th>
+              <th class="angka">Diskon</th>
+              <th class="angka">PPN</th>
+              <th class="angka">Total</th>
+              <th class="angka">Dibayar</th>
+              <th class="angka">Kembalian</th>
+            </tr>
+          </thead>
+          <tbody id="rekap-transaksi"></tbody>
+        </table>
+      </div>
     </section>
   </main>
   <script src="scripts/navigation.js"></script>

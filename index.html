@@ -65,7 +65,12 @@
             <form id="form-barcode" class="barcode-form">
               <label for="input-barcode" class="visually-hidden">Ketik barcode</label>
               <input id="input-barcode" type="text" inputmode="numeric" placeholder="Ketik angka barcode">
-              <button type="submit" class="primary-button">Cari</button>
+              <button type="submit" class="primary-button search-button" aria-label="Cari barcode">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="10.8" cy="10.8" r="6.8"></circle>
+                  <path d="m16 16 4.5 4.5"></path>
+                </svg>
+              </button>
             </form>
             <span id="barcode-terbaca" class="scanner-status">Belum ada barcode terbaca</span>
           </div>
