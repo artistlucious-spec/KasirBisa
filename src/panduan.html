@@ -50,18 +50,18 @@
       <section id="login" class="guide-section">
         <p class="eyebrow">01 · AKSES</p>
         <h2>Login ke Kasir Bisa</h2>
-        <p>Pilih <strong>Daftar usaha</strong> untuk membuat akun dengan nama usaha, nama pengguna, nomor WhatsApp, dan password minimal 12 karakter. Setiap usaha memiliki ruang data tersendiri. Sesi login berlaku hingga 12 jam; gunakan tombol <strong>Keluar</strong> setelah selesai menggunakan kasir.</p>
-        <p>Administrator perlu menerapkan migrasi D1 terbaru, termasuk <code>0004_multi_tenant_accounts.sql</code>, sebelum pendaftaran digunakan. Secret <code>AUTH_SESSION_SECRET</code> (minimal 32 karakter acak) wajib disiapkan pada environment Cloudflare Pages. Secret <code>KASIR_USERNAME</code> dan <code>KASIR_PASSWORD</code> hanya opsional untuk membuat ulang akun lama bila diperlukan. Pengguna lama harus login kembali setelah migrasi. Jangan memasukkan nilai secret ke kode atau membagikannya.</p>
+        <p>Untuk membuat akun, pilih <strong>Daftar usaha</strong> di halaman masuk. Isi nama usaha, nama pengguna, nomor WhatsApp, password minimal 12 karakter, lalu ulangi password. Nama pengguna dan nomor WhatsApp hanya dapat digunakan pada satu akun. Setelah pendaftaran berhasil, Anda langsung masuk ke kasir.</p>
+        <p>Produk, stok, dan transaksi tersimpan di akun usaha Anda dan terpisah dari usaha lain. Untuk masuk kembali, gunakan nama pengguna atau nomor WhatsApp beserta password. Demi keamanan, Anda akan diminta masuk lagi setelah 12 jam; jika memakai perangkat bersama, pilih <strong>Keluar</strong> setelah selesai.</p>
       </section>
 
       <section id="profil" class="guide-section">
         <p class="eyebrow">02 · AKUN</p>
         <h2>Mengubah profil dan password</h2>
         <ol>
-          <li>Buka menu hamburger (ikon tiga garis) lalu pilih <strong>Profil</strong>.</li>
-          <li>Ubah nama pengguna atau pilih foto profil. Foto JPG, PNG, atau WebP akan diperkecil otomatis.</li>
-          <li>Untuk mengganti password, isi password saat ini, password baru minimal 12 karakter, lalu ulangi password baru.</li>
-          <li>Tekan <strong>Simpan perubahan</strong>. Sesi login pada perangkat lain akan berakhir jika nama pengguna atau password berubah.</li>
+          <li>Buka menu (ikon tiga garis) lalu pilih <strong>Profil</strong>.</li>
+          <li>Ubah nama pengguna atau pilih foto profil, lalu tekan <strong>Simpan perubahan</strong>. Foto JPG, PNG, atau WebP akan diperkecil otomatis. Password saat ini tidak diminta untuk perubahan ini.</li>
+          <li>Tekan ikon mata pada baris Password untuk melihat password tersimpan. Akun lama perlu masuk kembali sekali setelah pembaruan agar password bisa ditampilkan. Untuk menggantinya, pilih <strong>Ganti password</strong>. Nama pengguna akan disembunyikan agar perubahan nama dan password dilakukan terpisah. Isi password saat ini untuk verifikasi, password baru minimal 12 karakter, lalu ulangi password baru.</li>
+          <li>Tekan <strong>Simpan perubahan</strong>. Jika nama pengguna atau password berubah, Anda perlu masuk kembali di perangkat lain.</li>
         </ol>
       </section>
 
@@ -106,7 +106,7 @@
         <p class="eyebrow">06 · ANALISIS</p>
         <h2>Menggunakan Smart Insight</h2>
         <p>Buka <a href="smart-insight.html">Smart Insight</a> untuk melihat ringkasan transaksi, produk terlaris, stok menipis, jam ramai, dan saran penjualan. Tekan <strong>Buat insight baru</strong> untuk memperbarui analisis.</p>
-        <p>Jika analisis gagal, data ringkasan yang tersedia tetap dapat ditampilkan. Pengaturan Gemini merupakan tugas administrator; jangan memasukkan atau membagikan API key di halaman kasir.</p>
+        <p>Jika analisis tidak dapat diperbarui, ringkasan dari data transaksi yang tersedia tetap dapat dilihat. Coba lagi nanti atau hubungi pengelola Kasir Bisa jika kendala berlanjut.</p>
       </section>
 
       <section id="kendala" class="guide-section">
@@ -117,7 +117,7 @@
           <li><strong>Barcode sudah dipakai:</strong> setiap produk harus memiliki barcode yang berbeda. Periksa katalog sebelum menyimpan.</li>
           <li><strong>Produk tidak bisa ditambahkan:</strong> stok mungkin habis. Edit stok produk sebelum melanjutkan penjualan.</li>
           <li><strong>Pembayaran ditolak:</strong> pastikan jumlah uang yang dimasukkan sama dengan atau lebih besar dari total.</li>
-          <li><strong>Data atau Smart Insight gagal dimuat:</strong> periksa koneksi internet. Jika tetap gagal, hubungi administrator website.</li>
+          <li><strong>Data atau Smart Insight gagal dimuat:</strong> periksa koneksi internet. Jika tetap gagal, hubungi pengelola website.</li>
         </ul>
       </section>
     </div>

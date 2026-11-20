@@ -16,6 +16,7 @@
 - Memfilter data dan mengunduh rekap yang tampil sebagai CSV.
 - Melihat total penjualan, produk terlaris, stok menipis, dan jam ramai.
 - Smart Insight menghitung ringkasan dari D1. Jika `GEMINI_API_KEY` dikonfigurasi, hasil dapat dilengkapi analisis Gemini.
+- Jika layanan Gemini sedang sibuk atau tidak tersedia, ringkasan cadangan tetap ditampilkan bersama pemberitahuan berbahasa Indonesia.
 
 ## Akun dan bantuan
 

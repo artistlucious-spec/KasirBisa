@@ -31,6 +31,7 @@ Browser
 3. Migrasi `0004_multi_tenant_accounts.sql` memindahkan data dan profil lama ke usaha `legacy-business`. Pengguna lama harus login kembali setelah migrasi karena format sesi berubah.
 4. Jika akun lama belum tersimpan, backend dapat membuatnya dari `KASIR_USERNAME` dan `KASIR_PASSWORD`.
 5. Password disimpan sebagai hash PBKDF2-SHA-256 dengan salt acak dan 100.000 iterasi (batas Cloudflare Workers), bukan sebagai teks biasa.
+   Untuk permintaan tampilan password di profil, aplikasi juga menyimpan salinan terenkripsi AES-GCM. Kunci AES diturunkan melalui HKDF dari `AUTH_SESSION_SECRET`; siapa pun yang memperoleh secret tersebut dan database dapat mendekripsi salinan password.
 6. Sesi ditandatangani dengan `AUTH_SESSION_SECRET`, menyertakan ID akun dan versi sesi, disimpan dalam cookie `HttpOnly`, dan berlaku 12 jam.
 7. Mengubah username atau password menaikkan versi sesi. Sesi pada perangkat lain menjadi tidak berlaku dan sesi aktif menerima cookie baru.
 8. Foto profil dikompres menjadi WebP di browser dan disimpan pada `users.profile_image`.

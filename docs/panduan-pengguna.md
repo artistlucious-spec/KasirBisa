@@ -4,16 +4,16 @@ Panduan ini melengkapi halaman [Panduan Penggunaan di aplikasi](../src/panduan.h
 
 ## Login
 
-Pilih **Daftar usaha** pada halaman login untuk membuat akun. Isi nama usaha, nama pengguna, nomor WhatsApp, dan password minimal 12 karakter. Setelah pendaftaran berhasil, Anda langsung masuk ke ruang data usaha tersebut. Nomor WhatsApp harus unik.
+Pilih **Daftar usaha** pada halaman masuk untuk membuat akun. Isi nama usaha, nama pengguna, nomor WhatsApp, password minimal 12 karakter, lalu ulangi password. Nama pengguna dan nomor WhatsApp hanya dapat digunakan pada satu akun. Setelah pendaftaran berhasil, Anda langsung masuk ke kasir.
 
-Pengguna lama tetap memakai akun sebelumnya. Setelah migrasi database, masuk kembali karena sesi lama tidak berlaku. Sesi baru berakhir setelah 12 jam; pilih **Keluar** melalui menu hamburger setelah selesai menggunakan perangkat bersama.
+Produk, stok, dan transaksi tersimpan di akun usaha Anda dan terpisah dari usaha lain. Untuk masuk kembali, gunakan nama pengguna atau nomor WhatsApp beserta password. Demi keamanan, Anda akan diminta masuk lagi setelah 12 jam; jika memakai perangkat bersama, pilih **Keluar** melalui menu (ikon tiga garis) setelah selesai.
 
 ## Mengubah profil
 
-1. Buka menu hamburger dan pilih **Profil**.
-2. Nama usaha dan nomor WhatsApp ditampilkan sebagai informasi akun. Ubah nama pengguna atau pilih foto JPG, PNG, atau WebP. Foto maksimal 12 MB sebelum diperkecil otomatis.
-3. Untuk mengganti password, isi password saat ini, password baru minimal 12 karakter, dan konfirmasi password baru.
-4. Pilih **Simpan perubahan**. Perubahan username/password mengakhiri sesi pada perangkat lain.
+1. Buka menu (ikon tiga garis) dan pilih **Profil**.
+2. Nama usaha dan nomor WhatsApp ditampilkan sebagai informasi akun. Password tersimpan ditampilkan sebagai titik-titik; tekan ikon mata untuk melihatnya. Ubah nama pengguna atau pilih foto JPG, PNG, atau WebP, lalu simpan perubahan. Foto maksimal 12 MB sebelum diperkecil otomatis. Akun lama perlu masuk kembali sekali setelah pembaruan agar password bisa ditampilkan.
+3. Tekan ikon mata pada baris Password untuk melihat password tersimpan. Untuk menggantinya, pilih **Ganti password**. Nama pengguna akan disembunyikan agar perubahan nama dan password dilakukan terpisah. Isi password saat ini untuk verifikasi, password baru minimal 12 karakter, lalu ulangi password baru.
+4. Pilih **Simpan perubahan**. Jika nama pengguna atau password berubah, Anda perlu masuk kembali di perangkat lain.
 
 ## Menyiapkan katalog
 
@@ -34,12 +34,12 @@ Pengguna lama tetap memakai akun sebelumnya. Setelah migrasi database, masuk kem
 
 - Gunakan halaman Rekap untuk mencari atau memfilter transaksi, lalu pilih **Unduh CSV** untuk mengekspor data yang tampil.
 - Gunakan Smart Insight untuk melihat ringkasan penjualan, produk terlaris, stok menipis, dan jam ramai.
-- Jika layanan Gemini tidak aktif, ringkasan dasar dari data transaksi tetap dapat tersedia.
+- Jika analisis tidak dapat diperbarui, ringkasan dari data transaksi yang tersedia tetap dapat dilihat. Coba lagi nanti atau hubungi pengelola Kasir Bisa jika kendala berlanjut.
 
 ## Jika terjadi masalah
 
 - Kamera tidak tersedia: gunakan input barcode manual.
 - Barcode ditolak: cari produk yang sudah memakai barcode tersebut.
 - Pembayaran gagal: periksa jumlah uang dan stok produk.
-- Tidak dapat mengganti profil: pastikan migrasi D1 terbaru sudah diterapkan dan masukkan password saat ini dengan benar.
-- Jika sesi habis, masuk kembali menggunakan akun yang berlaku.
+- Tidak dapat menyimpan perubahan profil: pastikan password saat ini benar dan nama pengguna belum digunakan akun lain. Jika masih gagal, hubungi pengelola Kasir Bisa.
+- Jika diminta masuk kembali, gunakan nama pengguna atau nomor WhatsApp beserta password.

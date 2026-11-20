@@ -7,7 +7,8 @@ const textEncoder = new TextEncoder();
 const USER_SELECT = `SELECT
   users.id, users.business_id, users.username, users.whatsapp,
   users.password_hash, users.password_salt, users.password_iterations,
-  users.profile_image, users.session_version, businesses.name AS business_name
+  users.password_encrypted, users.profile_image, users.session_version,
+  businesses.name AS business_name
   FROM users JOIN businesses ON businesses.id = users.business_id`;
 
 function json(data, status = 200, extraHeaders = {}) {
@@ -58,6 +59,55 @@ async function hashPassword(password) {
   };
 }
 
+async function passwordEncryptionKey(secret, usages) {
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    textEncoder.encode(secret),
+    "HKDF",
+    false,
+    ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: textEncoder.encode("KasirBisa/password-view/v1"),
+      info: textEncoder.encode("AES-GCM password encryption"),
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    usages
+  );
+}
+
+async function encryptPassword(password, secret) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await passwordEncryptionKey(secret, ["encrypt"]);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    textEncoder.encode(password)
+  );
+  return `v1.${bytesToBase64Url(iv)}.${bytesToBase64Url(new Uint8Array(ciphertext))}`;
+}
+
+async function decryptPassword(encryptedPassword, secret) {
+  const [version, encodedIv, encodedCiphertext, ...extra] = String(encryptedPassword || "").split(".");
+  if (version !== "v1" || !encodedIv || !encodedCiphertext || extra.length) {
+    throw new Error("Format password terenkripsi tidak valid.");
+  }
+  const iv = base64UrlToBytes(encodedIv);
+  if (iv.length !== 12) throw new Error("Format password terenkripsi tidak valid.");
+  const key = await passwordEncryptionKey(secret, ["decrypt"]);
+  const plaintext = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    base64UrlToBytes(encodedCiphertext)
+  );
+  return new TextDecoder().decode(plaintext);
+}
+
 async function verifyPassword(password, profile) {
   let salt;
   let expectedHash;
@@ -88,9 +138,16 @@ async function getOrCreateLegacyUser(env) {
   if (user || !bootstrapCredentialsConfigured(env)) return user;
 
   const credentials = await hashPassword(env.KASIR_PASSWORD);
+  const encryptedPassword = await encryptPassword(env.KASIR_PASSWORD, env.AUTH_SESSION_SECRET);
   await env.DB.prepare(
-    "INSERT OR IGNORE INTO users (id, business_id, username, password_hash, password_salt, password_iterations) VALUES ('legacy-owner', 'legacy-business', ?, ?, ?, ?)"
-  ).bind(env.KASIR_USERNAME.trim(), credentials.hash, credentials.salt, credentials.iterations).run();
+    "INSERT OR IGNORE INTO users (id, business_id, username, password_hash, password_salt, password_iterations, password_encrypted) VALUES ('legacy-owner', 'legacy-business', ?, ?, ?, ?, ?)"
+  ).bind(
+    env.KASIR_USERNAME.trim(),
+    credentials.hash,
+    credentials.salt,
+    credentials.iterations,
+    encryptedPassword
+  ).run();
   user = await getUserById(env, "legacy-owner");
   return user;
 }
@@ -227,10 +284,11 @@ async function authApi(request, env, pathname) {
     const userId = crypto.randomUUID();
     const businessId = crypto.randomUUID();
     const credentials = await hashPassword(password);
+    const encryptedPassword = await encryptPassword(password, env.AUTH_SESSION_SECRET);
     await env.DB.batch([
       env.DB.prepare("INSERT INTO businesses (id, name) VALUES (?, ?)").bind(businessId, businessName),
       env.DB.prepare(
-        "INSERT INTO users (id, business_id, username, whatsapp, password_hash, password_salt, password_iterations) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        "INSERT INTO users (id, business_id, username, whatsapp, password_hash, password_salt, password_iterations, password_encrypted) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
       ).bind(
         userId,
         businessId,
@@ -238,7 +296,8 @@ async function authApi(request, env, pathname) {
         whatsapp,
         credentials.hash,
         credentials.salt,
-        credentials.iterations
+        credentials.iterations,
+        encryptedPassword
       ),
     ]);
 
@@ -276,6 +335,11 @@ async function authApi(request, env, pathname) {
       return json({ error: "Nama pengguna atau password salah." }, 401);
     }
 
+    const encryptedPassword = await encryptPassword(password, env.AUTH_SESSION_SECRET);
+    await env.DB.prepare(
+      "UPDATE users SET password_encrypted = ? WHERE id = ?"
+    ).bind(encryptedPassword, user.id).run();
+
     const token = await createSessionToken(env.AUTH_SESSION_SECRET, user.id, user.session_version);
     return json({ success: true }, 200, cookieHeaders(request, token, AUTH_SESSION_SECONDS));
   }
@@ -301,11 +365,21 @@ async function authApi(request, env, pathname) {
       return json({ error: "Sesi login tidak valid. Silakan masuk kembali." }, 401);
     }
     if (request.method === "GET") {
+      let password = null;
+      if (user.password_encrypted) {
+        try {
+          password = await decryptPassword(user.password_encrypted, env.AUTH_SESSION_SECRET);
+        } catch (error) {
+          console.error("Password profil tidak dapat didekripsi.", error);
+          return json({ error: "Password profil tidak dapat ditampilkan. Silakan masuk kembali." }, 500);
+        }
+      }
       return json({
         username: user.username,
         whatsapp: user.whatsapp,
         businessName: user.business_name,
         profileImage: user.profile_image,
+        password,
       });
     }
 
@@ -316,16 +390,19 @@ async function authApi(request, env, pathname) {
     const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
     const hasImage = Object.hasOwn(body, "profileImage");
     const profileImage = hasImage ? body.profileImage : null;
-    if (!username || username.length > 128 || !currentPassword || currentPassword.length > 256) {
-      return json({ error: "Nama pengguna atau password saat ini tidak valid." }, 400);
+    if (!username || username.length > 128 || currentPassword.length > 256) {
+      return json({ error: "Nama pengguna atau password tidak valid." }, 400);
     }
     if (newPassword && (newPassword.length < 12 || newPassword.length > 256)) {
       return json({ error: "Password baru harus berisi 12 sampai 256 karakter." }, 400);
     }
+    if (newPassword && !currentPassword) {
+      return json({ error: "Password saat ini wajib diisi untuk mengganti password." }, 400);
+    }
     if (hasImage && !validProductImage(profileImage)) {
       return json({ error: "Foto profil tidak valid atau terlalu besar." }, 400);
     }
-    if (!await verifyPassword(currentPassword, user)) {
+    if (newPassword && !await verifyPassword(currentPassword, user)) {
       return json({ error: "Password saat ini salah." }, 401);
     }
     if (!hasImage && !newPassword && username === user.username) {
@@ -341,15 +418,19 @@ async function authApi(request, env, pathname) {
       salt: user.password_salt,
       iterations: user.password_iterations,
     };
+    const encryptedPassword = newPassword
+      ? await encryptPassword(newPassword, env.AUTH_SESSION_SECRET)
+      : user.password_encrypted;
     const credentialsChanged = username !== user.username || Boolean(newPassword);
     const sessionVersion = Number(user.session_version) + (credentialsChanged ? 1 : 0);
     const result = await env.DB.prepare(
-      "UPDATE users SET username = ?, password_hash = ?, password_salt = ?, password_iterations = ?, profile_image = COALESCE(?, profile_image), session_version = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+      "UPDATE users SET username = ?, password_hash = ?, password_salt = ?, password_iterations = ?, password_encrypted = ?, profile_image = COALESCE(?, profile_image), session_version = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
     ).bind(
       username,
       nextPassword.hash,
       nextPassword.salt,
       nextPassword.iterations,
+      encryptedPassword,
       profileImage,
       sessionVersion,
       user.id
