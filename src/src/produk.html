@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#1769c2"><title>Produk & Stok - Kasir BISA</title><script src="scripts/auth-guard.js"></script><link rel="stylesheet" href="assets/css/style.css"><link rel="icon" type="image/png" href="icon/Favicon.png"></head><body class="halaman-produk">
+<header class="site-header">
+  <a class="brand" href="index.html" aria-label="Kasir Bisa, halaman kasir"><img class="brand-logo" src="icon/Favicon.png" alt=""><span><strong>Kasir BISA</strong><small>Asisten usaha Anda</small></span></a>
+  <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Buka menu" aria-controls="site-menu" aria-expanded="false"><span></span><span></span><span></span></button>
+  <nav id="site-menu" class="header-nav" aria-label="Navigasi utama" hidden>
+    <a class="header-link" href="index.html">Kasir</a><a class="header-link" href="produk.html">Produk &amp; Stok</a><a class="header-link" href="riwayat.html">Riwayat Transaksi</a><a class="header-link" href="laporan.html">Laporan Penjualan</a><a class="header-link" href="smart-insight.html">Smart Insight</a>
+      <a class="header-link" href="pusat-perhatian.html">Pusat Perhatian Toko <span id="store-alert-badge" class="count-badge" hidden>0</span></a>
+      <a class="header-link" href="tanya-smart-insight.html">Tanya Smart Insight</a><a class="header-link" href="panduan.html">Panduan</a><a class="header-link" href="profile.html">Profil Usaha</a><button id="tombol-keluar" class="header-link logout-button" type="button">Keluar</button>
+  </nav>
+</header>
+<main>
+<section class="page-intro"><div><p class="eyebrow">PENGELOLAAN INVENTARIS</p><h1>Produk &amp; Stok</h1><p class="page-subtitle">Pantau persediaan dan kelola produk usaha Anda di satu tempat.</p></div><button id="tambah-produk" class="primary-button page-primary-action" type="button">＋ Tambah produk</button></section>
+<div id="pesan-produk" class="notice" role="status" aria-live="polite"></div>
+<section class="stock-summary" aria-label="Ringkasan stok">
+  <article class="summary-card"><span>Jenis produk</span><strong id="stat-jenis">–</strong><small>Produk terdaftar</small></article>
+  <article class="summary-card"><span>Total stok</span><strong id="stat-total">–</strong><small>Seluruh unit barang</small></article>
+  <article class="summary-card warning"><span>Stok menipis</span><strong id="stat-menipis">–</strong><small>Stok 1–10 unit</small></article>
+  <article class="summary-card danger"><span>Stok habis</span><strong id="stat-habis">–</strong><small>Perlu diisi ulang</small></article>
+</section>
+<section class="management-panel"><div class="section-heading"><div><h2>Daftar produk</h2><p class="page-subtitle">Kelola nama, harga, barcode, foto, dan jumlah stok.</p></div><span id="jumlah-produk" class="muted"></span></div>
+  <div class="management-filters"><label class="search-field"><span class="visually-hidden">Cari produk</span><input id="cari-produk-manage" type="search" placeholder="Cari nama atau barcode produk…"></label><label><span class="visually-hidden">Filter kategori</span><select id="filter-kategori-manage"><option value="">Semua kategori</option></select></label></div>
+  <div class="stock-filter-chips" role="group" aria-label="Filter status stok"><button type="button" class="filter-chip active" data-stock-filter="all">Semua</button><button type="button" class="filter-chip" data-stock-filter="available">Tersedia</button><button type="button" class="filter-chip" data-stock-filter="low">Menipis</button><button type="button" class="filter-chip" data-stock-filter="out">Habis</button></div>
+  <div id="daftar-produk-manage" class="management-product-list"><p class="empty-state">Memuat produk…</p></div>
+</section>
+<dialog id="dialog-produk-manage" class="form-dialog" aria-labelledby="judul-form-produk"><form id="form-produk-manage"><p class="eyebrow">DATA KATALOG</p><h2 id="judul-form-produk">Tambah produk</h2><input id="manage-kode" type="hidden"><div class="product-form-grid"><label>Nama produk<input id="manage-nama" type="text" required maxlength="120"></label><label>Barcode<input id="manage-barcode" type="text" inputmode="numeric" required></label><label>Kategori<input id="manage-kategori" type="text" required></label><label>Harga jual<input id="manage-harga" type="number" min="1" step="1" required></label><label>Jumlah stok<input id="manage-stok" type="number" min="0" step="1" required></label><label class="product-image-field">Foto produk (opsional)<input id="manage-gambar" type="file" accept="image/jpeg,image/png,image/webp"><small>Foto otomatis diperkecil sebelum disimpan.</small></label><div id="manage-preview" class="product-image-preview" hidden><img id="manage-preview-img" alt="Pratinjau foto produk"><button id="manage-remove-image" class="secondary-button" type="button">Hapus foto</button></div><p id="manage-image-status" class="product-image-status" role="status"></p></div><div class="dialog-actions"><button id="batal-form-produk" class="secondary-button" type="button">Batal</button><button id="simpan-form-produk" class="primary-button" type="submit">Simpan produk</button></div></form></dialog>
+</main>
+<script src="scripts/image-utils.js"></script><script src="scripts/produk.js"></script><script src="scripts/navigation.js"></script>
+</body></html>
