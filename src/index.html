@@ -144,7 +144,7 @@
                 <span>Tunai</span>
               </label>
               <label class="payment-method-option">
-                <input id="metode-qris" type="radio" name="metode-pembayaran" value="qris" disabled>
+                <input id="metode-qris" type="radio" name="metode-pembayaran" value="qris">
                 <span>QRIS <small id="status-pilihan-qris">Tambahkan QRIS toko terlebih dahulu</small></span>
               </label>
             </fieldset>
@@ -152,7 +152,7 @@
               <span>Pilih QRIS</span>
               <select id="pilihan-qris"></select>
             </label>
-            <div class="qris-management-links">
+            <div id="qris-management-links" class="qris-management-links" hidden>
               <a id="link-tambah-qris" class="qris-settings-link" href="qr.html?add=1" data-preserve-cart>＋ Tambah QRIS</a>
               <a id="link-lihat-qris" class="qris-settings-link" href="qr.html" data-preserve-cart>Lihat QRIS</a>
             </div>

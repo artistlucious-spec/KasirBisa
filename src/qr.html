@@ -52,18 +52,21 @@
         </label>
 
         <div id="qr-crop-stage" class="qr-crop-stage" hidden>
-          <h3>Pilih bagian gambar</h3>
-          <p>Geser kotak atau tarik sudutnya untuk mengatur bagian QRIS yang akan disimpan.</p>
+          <h3>Pilih area QRIS</h3>
+          <p>Tarik titik sudut untuk mengatur panjang dan lebar, titik di sisi untuk mengubah satu arah, atau bagian dalam kotak untuk memindahkannya. Area terpilih yang ditampilkan sebagai QRIS; bagian di luar kotak tetap tersimpan dan bisa dipilih lagi saat gambar diedit.</p>
           <canvas id="qr-crop-canvas" aria-label="Area pemotongan QRIS"></canvas>
           <div class="qr-crop-actions">
-            <button id="qr-crop-reset" class="secondary-button" type="button">Pilih ulang area</button>
-            <button id="qr-crop-apply" class="primary-button" type="button">Gunakan potongan</button>
+            <button id="qr-crop-reset" class="secondary-button" type="button">Reset area</button>
+            <button id="qr-crop-apply" class="primary-button" type="button">Gunakan area terpilih</button>
           </div>
         </div>
 
         <div id="qr-image-preview-wrap" class="qr-image-preview-wrap" hidden>
-          <img id="qr-image-preview" alt="Pratinjau gambar QRIS">
-          <button id="qr-image-recrop" class="secondary-button" type="button" hidden>Atur potongan lagi</button>
+          <div class="qr-image-preview-content">
+            <p id="qr-image-preview-caption">Pratinjau area QRIS</p>
+            <img id="qr-image-preview" alt="Pratinjau gambar QRIS yang akan disimpan">
+          </div>
+          <button id="qr-image-recrop" class="secondary-button" type="button" hidden>Atur area lagi</button>
         </div>
         <p id="qr-image-status" class="profile-status" role="status" aria-live="polite"></p>
 

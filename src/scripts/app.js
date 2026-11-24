@@ -199,11 +199,11 @@ function renderPembayaran() {
   if (qrSelected) pilihanQr.value = qrSelected.id;
   document.getElementById("qris-selection-wrap").hidden = !qrActives.length;
   pilihanQr.disabled = !qrActives.length;
-  pilihanQris.disabled = !qrisReady;
+  pilihanQris.disabled = false;
   document.getElementById("status-pilihan-qris").textContent =
     qrisReady ? "Periksa pembayaran secara manual" : "Tambahkan QRIS toko terlebih dahulu";
-  if (pilihanQris.disabled && pilihanQris.checked) document.getElementById("metode-tunai").checked = true;
   const isQris = pilihanQris.checked;
+  document.getElementById("qris-management-links").hidden = !isQris;
   const dibayar = isQris ? total : elBayar.value.trim() === "" ? NaN : Number(elBayar.value);
   const valid = isQris
     ? qrisReady
@@ -212,7 +212,7 @@ function renderPembayaran() {
   elBayar.disabled = isQris;
   document.getElementById("baris-uang-diterima").hidden = isQris;
   document.getElementById("baris-kembalian").hidden = isQris;
-  document.getElementById("panduan-qris-kasir").hidden = !isQris;
+  document.getElementById("panduan-qris-kasir").hidden = !isQris || !qrisReady;
   const qrisImage = document.getElementById("gambar-qris-kasir");
   if (qrSelected) {
     qrisImage.src = qrSelected.image;
