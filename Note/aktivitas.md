@@ -83,3 +83,35 @@ Buka [halaman signup produksi](https://kasirbisa.pages.dev/signup) dan daftar de
 - Transaksi sekarang mencatat metode pembayaran (`tunai` atau `qris`); dokumentasi database dan panduan pengguna diperbarui.
 - Migrasi `0007_payment_methods.sql` berhasil diterapkan pada D1 lokal. Pemeriksaan konfigurasi saat ini menunjukkan `wrangler.toml` project utama mengarah ke database `kasirbisa`; tidak ada migrasi remote, perubahan database produksi, atau deploy pada pekerjaan ini.
 - Pemeriksaan sintaks JavaScript, build statis, dan uji migrasi skema dalam SQLite memori berhasil. Migrasi D1 lokal sempat gagal pada percobaan di salinan `fixed`; percobaan pada project utama berhasil.
+
+### Dasbor admin dan pemulihan login produksi
+
+- Pengguna meminta dasbor admin online untuk mengelola akun dari komputer. Source lokal menambahkan daftar akun, ringkasan usaha, kontrol aktif/nonaktif, otorisasi server melalui `ADMIN_USERNAME`, dan migrasi `0008_admin_accounts.sql`. Pengujian lokal lulus; source belum di-deploy oleh sesi ini.
+- Setelah pengguna melaporkan gagal login di website, pemeriksaan endpoint menemukan `no such column: users.is_active`. Skema D1 produksi `kasirbisa` (ID `520d3b0f-e730-4a12-ad88-7b68afffce83`) dan riwayat migrasi diperiksa baca-saja; migrasi terakhir yang tercatat adalah `0005`.
+- Atas persetujuan pengguna, migrasi additive `0006_store_alerts.sql`, `0007_payment_methods.sql`, dan `0008_admin_accounts.sql` diterapkan ke D1 produksi. Akun lama mendapat status aktif melalui default `1`; migrasi tidak menghapus data.
+- Verifikasi setelah migrasi menunjukkan kolom `users.is_active` tersedia dan endpoint `/api/auth/session` kembali HTTP 200. Kredensial pengguna tidak dipakai atau diuji; pengguna perlu mencoba login kembali sendiri.
+- Panel Admin di source lokal diperluas menjadi akun/usaha, produk/stok, transaksi read-only, pembayaran/QR, dan Pusat Perhatian. Tidak ada hapus permanen; password tidak ditampilkan. Build dan pemeriksaan sintaks lulus.
+- Diagnostik produksi menunjukkan `/api/admin/data?resource=products` memberi HTTP 200 `text/html` (fallback halaman kasir), bukan JSON. Script produksi sudah menampilkan guard format respons, sehingga pesan tampil di UI dan tidak harus ada stack trace di console. Pages Function `functions/api/admin/data.js` belum dirutekan pada deployment yang diuji; deploy source dengan folder `functions`, `worker.js`, dan aset `src/` bersama. Belum ada deploy source oleh asisten.
+
+### QR Pembayaran dan panduan pengguna
+
+- Pengguna bertanya tugas administrator karena belum memahami perannya. Dijelaskan bahwa Admin mengelola akun dan kondisi sistem, bukan menjalankan transaksi kasir sehari-hari.
+- Atas permintaan pengguna, nama tampilan QRIS diubah menjadi **QR Pembayaran** agar cocok untuk kode QR DANA, GoPay, ShopeePay, atau QRIS. Pembaruan meliputi halaman Profil, checkout, pesan status, metode pada struk/riwayat/CSV, serta label panel terkait. Nilai internal transaksi tetap `qris`; tidak ada migrasi database.
+- Panduan dalam aplikasi dan `docs/panduan-pengguna.md` diperluas untuk login/profil, QR Pembayaran, Produk & Stok, transaksi/struk, riwayat, laporan penjualan, Smart Insight, Tanya Smart Insight, dan Pusat Perhatian Toko. Halaman Admin sengaja tidak dimasukkan. Perubahan juga dicatat di `CHANGELOG.md`.
+- Pemeriksaan `node --check` pada `src/scripts/app.js`, `profile.js`, `riwayat.js`, dan `admin.js`, serta `npm run build`, berhasil. Tidak ada deploy, migrasi, atau perubahan database.
+- Pengguna meminta agar `Note/.copilotignore` dibiarkan karena tidak akan diunggah. File dibaca atas permintaan pengguna tetapi tidak diubah; informasi sensitif yang ada di dalamnya tidak disalin ke catatan aktivitas.
+- Pengguna mengusulkan beberapa QR pembayaran per usaha dengan nama bebas. Rekomendasi desain: daftar QR berlabel di Profil, pilihan QR pada checkout, pengecekan pembayaran manual, dan pencatatan label penyedia di struk serta riwayat. Ini masih tahap diskusi; tidak ada source code, database, atau QR lama yang diubah.
+- Pengguna menambahkan edit nama/gambar dan kotak crop gambar yang dapat diubah ukurannya, tetapi kemudian memilih menunda ide multi-QR karena khawatir menambah kesulitan saat pitching. Tidak ada perubahan kode, database, atau gambar QR; fitur satu QR yang ada tetap dipakai.
+- Pengguna merasa bingung mengenai cakupan QR untuk pitch. Rekomendasi: bekukan fitur saat ini sebagai satu QR statis per usaha dengan pengecekan manual; tunda multi-QR dan crop sampai dibutuhkan. Tidak ada perubahan source atau database pada pembahasan ini.
+- Pengguna meminta nama metode dikembalikan menjadi **QRIS**. Setelah membaca `Note/note.txt`, dipastikan ide beberapa QR untuk DANA/GoPay ditunda karena dianggap kurang efisien untuk pitch.
+- Label QRIS dipulihkan pada Kasir, Profil, struk, riwayat/CSV, panel terkait, pesan error, dan panduan. Skema database serta nilai internal transaksi tetap; tidak ada migrasi atau deploy. `node --check` pada skrip/backend dan `npm run build` berhasil.
+
+## 2026-11-24 — Multi-QRIS per usaha
+
+- Pengguna menyetujui implementasi beberapa QRIS bernama per usaha, dengan batas 10; metode checkout tetap bernama QRIS.
+- Menambahkan migrasi `0009_multiple_payment_qrs.sql` untuk tabel daftar QR dan label pembayaran transaksi, termasuk pemindahan QR lama bernama "QRIS".
+- Menambahkan halaman privat QR yang tidak masuk menu navigasi dan dibuka dari Kasir. Fitur mencakup tambah, lihat, edit nama/gambar, crop dengan kotak yang bisa dipindah dan diubah ukurannya, aktif/nonaktif, dan hapus.
+- Checkout memilih QR aktif. Backend memvalidasi QR terhadap usaha sesi, konfirmasi pembayaran tetap manual, dan nama QR disimpan untuk struk/riwayat/CSV. Keranjang disimpan sementara saat pengguna membuka halaman QR.
+- Menghapus pengaturan QR tunggal dari Profil, menyesuaikan panel Admin, serta memperbarui panduan pengguna, panduan aplikasi, dokumentasi database, dan changelog. Halaman Admin tetap tidak dicantumkan dalam panduan pengguna.
+- Pengguna mengingatkan bahwa Cloudflare D1 tidak membuat tabel hanya karena source di-deploy. Perintah yang dicatat untuk menerapkan migrasi setelah memverifikasi target adalah `npx wrangler d1 migrations apply kasirbisa --remote` atau `npm run d1:migrate:remote`.
+- Uji migrasi 0001–0009, pemindahan QR lama, label transaksi lama, dan keunikan nama tanpa membedakan kapitalisasi berhasil dalam SQLite memori. Sintaks JavaScript dan build berhasil. Belum menerapkan migrasi ke D1 remote atau melakukan deploy.

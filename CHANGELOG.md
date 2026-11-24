@@ -10,6 +10,21 @@
 
 Perubahan penting pada website dicatat di sini.
 
+## Multi-QRIS per usaha (belum diterapkan ke D1 remote)
+- Menambahkan halaman privat `qr.html` yang dibuka melalui opsi QRIS di Kasir, tanpa menambahkan tautan ke navigasi umum atau Profil Usaha.
+- Pemilik dapat menyimpan hingga 10 QRIS bernama, mengedit nama/gambar, memilih area crop dengan kotak yang bisa digeser dan diubah ukurannya, mengaktifkan/menonaktifkan, serta menghapus QR.
+- Checkout memilih satu QR aktif, tetap memerlukan pengecekan pembayaran manual, dan mencatat nama QR pada struk serta riwayat/CSV.
+- Menambahkan migrasi `0009_multiple_payment_qrs.sql`; migrasi ini perlu diterapkan terpisah pada D1 Cloudflare. Tidak ada migrasi remote atau deploy yang dilakukan.
+
+## Nama metode pembayaran dikembalikan ke QRIS
+- Mengembalikan label metode, pengaturan, pesan, struk, dan riwayat dari "QR Pembayaran" ke "QRIS" sesuai keputusan pengguna.
+- Fitur tetap hanya mendukung satu gambar QRIS per usaha; usulan multi-QR ditunda. Tidak ada perubahan skema database.
+
+## QR Pembayaran dan panduan pengguna
+- Mengganti label pengguna "QRIS" menjadi "QR Pembayaran" agar sesuai dengan kode QR dari penyedia pembayaran berbeda seperti DANA, GoPay, ShopeePay, atau QRIS; nilai internal dan transaksi lama tetap kompatibel.
+- Memperbarui panduan di aplikasi dan dokumentasi untuk Produk & Stok, pembayaran, struk, riwayat, laporan, Smart Insight, Tanya Smart Insight, serta Pusat Perhatian Toko.
+- Halaman Admin tidak dimasukkan ke dalam panduan pengguna.
+
 ## Dasbor admin akun
 - Menambahkan halaman Admin dengan pencarian akun, ringkasan jumlah produk/transaksi, dan kontrol aktif/nonaktif akun.
 - Membatasi endpoint admin di backend berdasarkan `ADMIN_USERNAME`; akun nonaktif ditolak saat login maupun saat memakai sesi lama.

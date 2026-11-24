@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1565c0">
+  <title>Kelola QRIS - Kasir Bisa</title>
+  <script src="scripts/auth-guard.js"></script>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="icon" type="image/png" href="icon/Favicon.png">
+</head>
+<body class="halaman-kelola-qris">
+  <main class="qr-manager-main">
+    <header class="qr-manager-header">
+      <a class="secondary-button" href="index.html">← Kembali ke Kasir</a>
+      <div>
+        <p class="eyebrow">METODE PEMBAYARAN</p>
+        <h1>Kelola QRIS</h1>
+        <p>Tambah, ubah nama atau gambar, dan pilih QRIS yang tersedia di Kasir.</p>
+      </div>
+    </header>
+
+    <div id="qr-notice" class="notice" role="status" aria-live="polite"></div>
+
+    <section class="qr-manager-panel" aria-labelledby="qr-list-title">
+      <div class="qr-manager-section-heading">
+        <div>
+          <h2 id="qr-list-title">Daftar QRIS</h2>
+          <p>Anda dapat menyimpan hingga 10 QRIS untuk usaha ini.</p>
+        </div>
+        <button id="qr-add" class="primary-button" type="button">＋ Tambah QRIS</button>
+      </div>
+      <div id="qr-list" class="qr-manager-list" aria-live="polite">
+        <p class="empty-state">Memuat daftar QRIS...</p>
+      </div>
+    </section>
+
+    <section id="qr-editor" class="qr-manager-panel qr-editor-panel" aria-labelledby="qr-editor-title" hidden>
+      <div class="qr-manager-section-heading">
+        <div>
+          <p class="eyebrow">PENGATURAN QRIS</p>
+          <h2 id="qr-editor-title">Tambah QRIS</h2>
+        </div>
+      </div>
+      <form id="qr-form">
+        <label for="qr-name">Nama QRIS
+          <input id="qr-name" type="text" maxlength="40" autocomplete="off" placeholder="Contoh: QRIS Toko" required>
+        </label>
+        <label for="qr-image-file">Gambar QRIS
+          <input id="qr-image-file" type="file" accept="image/jpeg,image/png,image/webp">
+          <small>Pilih JPG, PNG, atau WebP. Ukuran file asli maksimal 12 MB.</small>
+        </label>
+
+        <div id="qr-crop-stage" class="qr-crop-stage" hidden>
+          <h3>Pilih bagian gambar</h3>
+          <p>Geser kotak atau tarik sudutnya untuk mengatur bagian QRIS yang akan disimpan.</p>
+          <canvas id="qr-crop-canvas" aria-label="Area pemotongan QRIS"></canvas>
+          <div class="qr-crop-actions">
+            <button id="qr-crop-reset" class="secondary-button" type="button">Pilih ulang area</button>
+            <button id="qr-crop-apply" class="primary-button" type="button">Gunakan potongan</button>
+          </div>
+        </div>
+
+        <div id="qr-image-preview-wrap" class="qr-image-preview-wrap" hidden>
+          <img id="qr-image-preview" alt="Pratinjau gambar QRIS">
+          <button id="qr-image-recrop" class="secondary-button" type="button" hidden>Atur potongan lagi</button>
+        </div>
+        <p id="qr-image-status" class="profile-status" role="status" aria-live="polite"></p>
+
+        <div class="qr-editor-actions">
+          <button id="qr-cancel" class="secondary-button" type="button">Batal</button>
+          <button id="qr-save" class="primary-button" type="submit">Simpan QRIS</button>
+        </div>
+      </form>
+    </section>
+  </main>
+  <script src="scripts/qr.js"></script>
+</body>
+</html>

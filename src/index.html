@@ -145,10 +145,17 @@
               </label>
               <label class="payment-method-option">
                 <input id="metode-qris" type="radio" name="metode-pembayaran" value="qris" disabled>
-                <span>QRIS <small id="status-pilihan-qris">Atur QRIS toko terlebih dahulu</small></span>
+                <span>QRIS <small id="status-pilihan-qris">Tambahkan QRIS toko terlebih dahulu</small></span>
               </label>
             </fieldset>
-            <a id="link-atur-qris" class="qris-settings-link" href="profile.html">Atur QRIS toko</a>
+            <label id="qris-selection-wrap" class="qris-selection-wrap" for="pilihan-qris" hidden>
+              <span>Pilih QRIS</span>
+              <select id="pilihan-qris"></select>
+            </label>
+            <div class="qris-management-links">
+              <a id="link-tambah-qris" class="qris-settings-link" href="qr.html?add=1" data-preserve-cart>＋ Tambah QRIS</a>
+              <a id="link-lihat-qris" class="qris-settings-link" href="qr.html" data-preserve-cart>Lihat QRIS</a>
+            </div>
             <div id="panduan-qris-kasir" class="qris-checkout-guide" hidden>
               <img id="gambar-qris-kasir" alt="QRIS toko untuk dipindai pelanggan">
               <p>Tampilkan QR ini ke pelanggan. Pastikan pembayaran sudah masuk di aplikasi Anda sebelum menekan konfirmasi.</p>

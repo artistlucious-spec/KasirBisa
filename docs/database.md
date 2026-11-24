@@ -12,8 +12,9 @@ Kasir Bisa Web menggunakan Cloudflare D1 melalui binding `DB`. Konfigurasi datab
 - `0006_store_alerts.sql`: menambahkan penyimpanan Pusat Perhatian Toko dengan status, prioritas, bukti analisis, dan pencegahan duplikasi notifikasi aktif per usaha.
 - `0007_payment_methods.sql`: mencatat metode pembayaran pada transaksi dan menyimpan gambar serta status QRIS per usaha.
 - `0008_admin_accounts.sql`: menambahkan status aktif/nonaktif akun untuk pengelolaan akses admin.
+- `0009_multiple_payment_qrs.sql`: menambahkan daftar hingga 10 QRIS bernama per usaha, memindahkan gambar QRIS lama, dan menyimpan label QR yang dipakai pada transaksi.
 
-Jalankan `npm run d1:migrate:local` untuk D1 lokal. Setelah menerapkan `0005_password_encrypted.sql`, pengguna lama harus login kembali agar aplikasi dapat membuat salinan password terenkripsi dari password yang baru diverifikasi. Jalankan `npm run d1:migrate:remote` hanya setelah memastikan akun Cloudflare dan database remote yang dikonfigurasi adalah milik project Pages `kasirbisa`. Jangan menjalankan migrasi remote tanpa memeriksa target database.
+Jalankan `npm run d1:migrate:local` untuk D1 lokal. Database Cloudflare remote tidak membuat tabel secara otomatis ketika kode di-deploy; migrasi perlu diterapkan secara terpisah. Untuk target pada `wrangler.toml`, periksa dahulu nama dan ID database, lalu jalankan `npx wrangler d1 migrations apply kasirbisa --remote` dari folder project ini (atau `npm run d1:migrate:remote`). Jangan jalankan perintah remote sebelum memastikan akun Cloudflare dan database yang dituju adalah target yang benar. Setelah menerapkan `0005_password_encrypted.sql`, pengguna lama harus login kembali agar aplikasi dapat membuat salinan password terenkripsi dari password yang baru diverifikasi.
 
 ## Tabel
 
@@ -31,11 +32,15 @@ Menyimpan `business_id`, kode, barcode, nama, kategori, harga, stok, dan gambar.
 
 ### `transactions`
 
-Menyimpan ID transaksi, `business_id`, waktu, subtotal, diskon, PPN, total, uang dibayar, kembalian, status member, dan metode pembayaran (`tunai` atau `qris`). Riwayat sebelum migrasi `0007` dianggap sebagai transaksi tunai.
+Menyimpan ID transaksi, `business_id`, waktu, subtotal, diskon, PPN, total, uang dibayar, kembalian, status member, metode pembayaran (`tunai` atau `qris`), dan label QR yang dipakai. QR yang digunakan diperiksa backend berdasarkan ID QR serta kepemilikan usaha dan status aktif; nama QR yang disimpan pada transaksi tidak berubah jika nama QR kemudian diedit atau dihapus.
 
 ### `business_payment_settings`
 
-Menyimpan status QRIS dan gambar QRIS statis yang dimiliki masing-masing usaha. Setiap pengaturan terikat ke `business_id` dari sesi login; gambar hanya ditampilkan kepada pengguna usaha tersebut. QRIS statis memerlukan pemeriksaan pembayaran manual oleh kasir sebelum transaksi disimpan.
+Tabel lama untuk satu QRIS per usaha. Pada migrasi `0009`, gambar QRIS yang tersimpan dipindahkan ke tabel `business_payment_qrs` dengan nama awal **QRIS**. Tabel lama dipertahankan untuk kompatibilitas data; pengelolaan QRIS baru tidak lagi memakai tabel ini.
+
+### `business_payment_qrs`
+
+Menyimpan daftar QRIS statis per usaha: ID, nama, gambar, status aktif, dan waktu pembuatan/perubahan. Nama unik tanpa membedakan kapitalisasi untuk tiap usaha; aplikasi membatasi jumlah hingga 10 QR per usaha. Setiap perubahan dibatasi oleh `business_id` sesi pemilik. Pembayaran QRIS tetap diperiksa secara manual oleh kasir sebelum transaksi disimpan.
 
 ### `transaction_items`
 

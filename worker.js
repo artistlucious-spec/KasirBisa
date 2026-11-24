@@ -1,6 +1,7 @@
 // Backend bersama untuk semua route Pages: autentikasi, produk, transaksi, dan insight.
 const MAX_PRODUCT_IMAGE_LENGTH = 140 * 1024;
 const MAX_QRIS_IMAGE_LENGTH = 140 * 1024;
+const MAX_QRIS_COUNT_PER_BUSINESS = 10;
 const AUTH_COOKIE_NAME = "kasir_bisa_session";
 const AUTH_SESSION_SECONDS = 12 * 60 * 60;
 const PASSWORD_HASH_ITERATIONS = 100_000;
@@ -409,6 +410,9 @@ async function authApi(request, env, pathname) {
       });
     }
 
+    if (!["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) {
+      return json({ error: "Method tidak didukung" }, 405);
+    }
     const body = await parseJsonBody(request);
     if (!body) return json({ error: "Data profil tidak valid." }, 400);
     const username = typeof body.username === "string" ? body.username.trim() : "";
@@ -726,7 +730,7 @@ async function adminDataApi(request, env) {
       ).first(),
       env.DB.prepare(
         `SELECT transactions.id, transactions.business_id, transactions.waktu, transactions.total,
-          transactions.payment_method, businesses.name AS business_name, users.username,
+          transactions.payment_method, transactions.payment_label, businesses.name AS business_name, users.username,
           (SELECT COUNT(*) FROM transaction_items WHERE transaction_items.transaction_id = transactions.id) AS item_count
          FROM transactions
          JOIN businesses ON businesses.id = transactions.business_id
@@ -745,6 +749,7 @@ async function adminDataApi(request, env) {
         time: row.waktu,
         total: Number(row.total),
         paymentMethod: row.payment_method || "tunai",
+        paymentLabel: row.payment_label || (row.payment_method === "qris" ? "QRIS" : "Tunai"),
         itemCount: Number(row.item_count) || 0,
       })),
       total: Number(count?.total) || 0,
@@ -760,7 +765,7 @@ async function adminDataApi(request, env) {
     const transaction = await env.DB.prepare(
       `SELECT transactions.id, transactions.business_id, transactions.waktu, transactions.subtotal,
         transactions.diskon, transactions.ppn, transactions.total, transactions.dibayar,
-        transactions.kembalian, transactions.member, transactions.payment_method,
+        transactions.kembalian, transactions.member, transactions.payment_method, transactions.payment_label,
         businesses.name AS business_name, users.username
        FROM transactions
        JOIN businesses ON businesses.id = transactions.business_id
@@ -781,6 +786,7 @@ async function adminDataApi(request, env) {
       kembalian: Number(transaction.kembalian),
       member: Boolean(transaction.member),
       paymentMethod: transaction.payment_method || "tunai",
+      paymentLabel: transaction.payment_label || (transaction.payment_method === "qris" ? "QRIS" : "Tunai"),
       items: (items.results || []).map((item) => ({
         code: item.code,
         name: item.name,
@@ -803,13 +809,14 @@ async function adminDataApi(request, env) {
       ).bind(...bindings).first(),
       env.DB.prepare(
         `SELECT businesses.id AS business_id, businesses.name AS business_name, users.username,
-          COALESCE(settings.qris_enabled, 0) AS qris_enabled,
-          CASE WHEN COALESCE(settings.qris_image, '') <> '' THEN 1 ELSE 0 END AS has_image,
-          settings.updated_at
+          COALESCE(SUM(payment_qrs.is_enabled), 0) AS enabled_count,
+          COUNT(payment_qrs.id) AS qr_count,
+          MAX(payment_qrs.updated_at) AS updated_at
          FROM businesses
          JOIN users ON users.business_id = businesses.id
-         LEFT JOIN business_payment_settings AS settings ON settings.business_id = businesses.id
+         LEFT JOIN business_payment_qrs AS payment_qrs ON payment_qrs.business_id = businesses.id
          ${where}
+         GROUP BY businesses.id, businesses.name, users.username
          ORDER BY businesses.name
          LIMIT 50 OFFSET ?`
       ).bind(...bindings, offset).all(),
@@ -819,8 +826,9 @@ async function adminDataApi(request, env) {
         businessId: row.business_id,
         businessName: row.business_name,
         username: row.username,
-        qrisEnabled: Boolean(row.qris_enabled),
-        hasImage: Boolean(row.has_image),
+        qrisEnabled: Number(row.enabled_count) > 0,
+        hasImage: Number(row.qr_count) > 0,
+        qrCount: Number(row.qr_count) || 0,
         updatedAt: row.updated_at || "",
       })),
       total: Number(count?.total) || 0,
@@ -831,19 +839,26 @@ async function adminDataApi(request, env) {
 
   if (resource === "payment" && request.method === "GET") {
     const businessId = url.searchParams.get("businessId") || "";
-    const settings = await env.DB.prepare(
-      `SELECT businesses.id AS business_id, businesses.name AS business_name,
-        COALESCE(settings.qris_enabled, 0) AS qris_enabled, COALESCE(settings.qris_image, '') AS qris_image
-       FROM businesses
-       LEFT JOIN business_payment_settings AS settings ON settings.business_id = businesses.id
-       WHERE businesses.id = ?`
+    const business = await env.DB.prepare(
+      "SELECT id, name FROM businesses WHERE id = ?"
     ).bind(businessId).first();
-    if (!settings) return json({ error: "Usaha tidak ditemukan." }, 404);
+    if (!business) return json({ error: "Usaha tidak ditemukan." }, 404);
+    const result = await env.DB.prepare(
+      "SELECT id, name, image, is_enabled, updated_at FROM business_payment_qrs WHERE business_id = ? ORDER BY created_at, name"
+    ).bind(businessId).all();
+    const qrs = (result.results || []).map((row) => ({
+      id: row.id,
+      name: row.name,
+      image: row.image,
+      enabled: Boolean(row.is_enabled),
+      updatedAt: row.updated_at,
+    }));
     return json({
-      businessId: settings.business_id,
-      businessName: settings.business_name,
-      qrisEnabled: Boolean(settings.qris_enabled),
-      qrisImage: settings.qris_image,
+      businessId: business.id,
+      businessName: business.name,
+      qrisEnabled: qrs.some((qr) => qr.enabled),
+      qrCount: qrs.length,
+      qrs,
     });
   }
 
@@ -851,23 +866,21 @@ async function adminDataApi(request, env) {
     const body = await parseJsonBody(request);
     const businessId = typeof body?.businessId === "string" ? body.businessId : "";
     if (!/^[\w-]{1,128}$/.test(businessId) || typeof body?.qrisEnabled !== "boolean") {
-      return json({ error: "Pengaturan QR pembayaran tidak valid." }, 400);
+      return json({ error: "Pengaturan QRIS tidak valid." }, 400);
     }
     const business = await env.DB.prepare(
       "SELECT id FROM businesses WHERE id = ?"
     ).bind(businessId).first();
     if (!business) return json({ error: "Usaha tidak ditemukan." }, 404);
     const settings = await env.DB.prepare(
-      "SELECT qris_image FROM business_payment_settings WHERE business_id = ?"
+      "SELECT COUNT(*) AS total FROM business_payment_qrs WHERE business_id = ?"
     ).bind(businessId).first();
-    if (body.qrisEnabled && !settings?.qris_image) {
+    if (body.qrisEnabled && !Number(settings?.total)) {
       return json({ error: "QR usaha belum tersedia; pemilik usaha perlu mengunggahnya terlebih dahulu." }, 400);
     }
     await env.DB.prepare(
-      `INSERT INTO business_payment_settings (business_id, qris_enabled, qris_image)
-       VALUES (?, ?, '')
-       ON CONFLICT(business_id) DO UPDATE SET qris_enabled = excluded.qris_enabled, updated_at = CURRENT_TIMESTAMP`
-    ).bind(businessId, body.qrisEnabled ? 1 : 0).run();
+      "UPDATE business_payment_qrs SET is_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE business_id = ?"
+    ).bind(body.qrisEnabled ? 1 : 0, businessId).run();
     return json({ success: true, qrisEnabled: body.qrisEnabled });
   }
 
@@ -987,38 +1000,109 @@ function validQrisImage(image) {
     && (image === "" || /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(image));
 }
 
+function validQrisName(name) {
+  return typeof name === "string" && name.trim().length > 0 && name.trim().length <= 40;
+}
+
 async function paymentSettingsApi(request, env, businessId) {
   if (request.method === "GET") {
-    const settings = await env.DB.prepare(
-      "SELECT qris_enabled, qris_image FROM business_payment_settings WHERE business_id = ?"
-    ).bind(businessId).first();
+    const result = await env.DB.prepare(
+      `SELECT id, name, image, is_enabled, created_at, updated_at
+       FROM business_payment_qrs
+       WHERE business_id = ?
+       ORDER BY created_at, name`
+    ).bind(businessId).all();
     return json({
-      qrisEnabled: Boolean(settings?.qris_enabled),
-      qrisImage: settings?.qris_image || "",
+      paymentQrs: (result.results || []).map((row) => ({
+        id: row.id,
+        name: row.name,
+        image: row.image,
+        enabled: Boolean(row.is_enabled),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
+      limit: MAX_QRIS_COUNT_PER_BUSINESS,
     });
   }
-  if (request.method !== "PUT") return json({ error: "Method tidak didukung" }, 405);
 
   const body = await parseJsonBody(request);
-  if (!body || typeof body.qrisEnabled !== "boolean" || typeof body.qrisImage !== "string") {
-    return json({ error: "Pengaturan pembayaran tidak valid." }, 400);
-  }
-  if (!validQrisImage(body.qrisImage)) {
-    return json({ error: "Gambar QRIS tidak valid atau terlalu besar." }, 400);
-  }
-  if (body.qrisEnabled && !body.qrisImage) {
-    return json({ error: "Unggah gambar QRIS sebelum mengaktifkannya." }, 400);
+
+  if (request.method === "POST") {
+    const name = typeof body?.name === "string" ? body.name.trim() : "";
+    const image = typeof body?.image === "string" ? body.image : "";
+    const enabled = body?.enabled === undefined ? true : body.enabled;
+    if (!validQrisName(name) || typeof body?.image !== "string" || typeof enabled !== "boolean") {
+      return json({ error: "Nama, gambar, atau status QRIS tidak valid." }, 400);
+    }
+    if (!image || !validQrisImage(image)) {
+      return json({ error: "Gambar QRIS tidak valid atau terlalu besar." }, 400);
+    }
+    const [count, duplicate] = await Promise.all([
+      env.DB.prepare(
+        "SELECT COUNT(*) AS total FROM business_payment_qrs WHERE business_id = ?"
+      ).bind(businessId).first(),
+      env.DB.prepare(
+        "SELECT id FROM business_payment_qrs WHERE business_id = ? AND name = ? COLLATE NOCASE"
+      ).bind(businessId, name).first(),
+    ]);
+    if (Number(count?.total) >= MAX_QRIS_COUNT_PER_BUSINESS) {
+      return json({ error: `Maksimal ${MAX_QRIS_COUNT_PER_BUSINESS} QRIS per usaha.` }, 409);
+    }
+    if (duplicate) return json({ error: "Nama QRIS sudah digunakan. Pilih nama lain." }, 409);
+    const id = `QR-${crypto.randomUUID()}`;
+    await env.DB.prepare(
+      "INSERT INTO business_payment_qrs (id, business_id, name, image, is_enabled) VALUES (?, ?, ?, ?, ?)"
+    ).bind(id, businessId, name, image, enabled ? 1 : 0).run();
+    return json({ success: true, qr: { id, name, image, enabled } }, 201);
   }
 
-  await env.DB.prepare(
-    `INSERT INTO business_payment_settings (business_id, qris_enabled, qris_image)
-     VALUES (?, ?, ?)
-     ON CONFLICT(business_id) DO UPDATE SET
-       qris_enabled = excluded.qris_enabled,
-       qris_image = excluded.qris_image,
-       updated_at = CURRENT_TIMESTAMP`
-  ).bind(businessId, body.qrisEnabled ? 1 : 0, body.qrisImage).run();
-  return json({ success: true, qrisEnabled: body.qrisEnabled, qrisImage: body.qrisImage });
+  if (request.method === "PUT") {
+    const id = typeof body?.id === "string" ? body.id.trim() : "";
+    const name = typeof body?.name === "string" ? body.name.trim() : "";
+    if (!id || id.length > 128 || !validQrisName(name) || typeof body?.image !== "string" || !validQrisImage(body.image) || !body.image) {
+      return json({ error: "Nama, gambar, atau QRIS yang dipilih tidak valid." }, 400);
+    }
+    const [existing, duplicate] = await Promise.all([
+      env.DB.prepare(
+        "SELECT id FROM business_payment_qrs WHERE business_id = ? AND id = ?"
+      ).bind(businessId, id).first(),
+      env.DB.prepare(
+        "SELECT id FROM business_payment_qrs WHERE business_id = ? AND name = ? COLLATE NOCASE AND id <> ?"
+      ).bind(businessId, name, id).first(),
+    ]);
+    if (!existing) return json({ error: "QRIS tidak ditemukan pada usaha ini." }, 404);
+    if (duplicate) return json({ error: "Nama QRIS sudah digunakan. Pilih nama lain." }, 409);
+    await env.DB.prepare(
+      `UPDATE business_payment_qrs SET name = ?, image = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE business_id = ? AND id = ?`
+    ).bind(name, body.image, businessId, id).run();
+    return json({ success: true });
+  }
+
+  if (request.method === "PATCH") {
+    const id = typeof body?.id === "string" ? body.id.trim() : "";
+    if (!id || id.length > 128 || typeof body?.enabled !== "boolean") {
+      return json({ error: "QRIS atau status yang dipilih tidak valid." }, 400);
+    }
+    const result = await env.DB.prepare(
+      `UPDATE business_payment_qrs SET is_enabled = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE business_id = ? AND id = ?`
+    ).bind(body.enabled ? 1 : 0, businessId, id).run();
+    if (!result.meta.changes) return json({ error: "QRIS tidak ditemukan pada usaha ini." }, 404);
+    return json({ success: true });
+  }
+
+  if (request.method === "DELETE") {
+    const id = new URL(request.url).searchParams.get("id") || "";
+    if (!id || id.length > 128) return json({ error: "QRIS yang dipilih tidak valid." }, 400);
+    const result = await env.DB.prepare(
+      "DELETE FROM business_payment_qrs WHERE business_id = ? AND id = ?"
+    ).bind(businessId, id).run();
+    if (!result.meta.changes) return json({ error: "QRIS tidak ditemukan pada usaha ini." }, 404);
+    return json({ success: true });
+  }
+
+  return json({ error: "Method tidak didukung" }, 405);
 }
 
 async function getProducts(env, businessId) {
@@ -1039,7 +1123,7 @@ async function getProducts(env, businessId) {
 
 async function getTransactions(env, businessId) {
   const result = await env.DB.prepare(
-    "SELECT id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member, payment_method FROM transactions WHERE business_id = ? ORDER BY waktu DESC"
+    "SELECT id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member, payment_method, payment_label FROM transactions WHERE business_id = ? ORDER BY waktu DESC"
   ).bind(businessId).all();
   const transactions = [];
   for (const row of result.results || []) {
@@ -1056,6 +1140,7 @@ async function getTransactions(env, businessId) {
       dibayar: row.dibayar,
       kembalian: row.kembalian,
       metodePembayaran: row.payment_method || "tunai",
+      labelPembayaran: row.payment_label || (row.payment_method === "qris" ? "QRIS" : "Tunai"),
       member: Boolean(row.member),
       items: (items.results || []).map((item) => ({
         kode: item.kode,
@@ -1147,6 +1232,7 @@ async function transactionsApi(request, env, businessId) {
   const body = await request.json();
   const items = Array.isArray(body.items) ? body.items : [];
   const paymentMethod = body.paymentMethod === undefined ? "tunai" : body.paymentMethod;
+  const paymentQrId = typeof body.paymentQrId === "string" ? body.paymentQrId : "";
   const dibayarInput = Number(body.dibayar);
   const member = Boolean(body.member);
   if (!items.length) return json({ error: "Keranjang masih kosong" }, 400);
@@ -1156,13 +1242,18 @@ async function transactionsApi(request, env, businessId) {
   if (paymentMethod === "tunai" && (!Number.isSafeInteger(dibayarInput) || dibayarInput < 0)) {
     return json({ error: "Jumlah pembayaran tidak valid" }, 400);
   }
+  let paymentLabel = "Tunai";
   if (paymentMethod === "qris") {
-    const settings = await env.DB.prepare(
-      "SELECT qris_enabled, qris_image FROM business_payment_settings WHERE business_id = ?"
-    ).bind(businessId).first();
-    if (!settings?.qris_enabled || !settings.qris_image || body.qrisConfirmed !== true) {
+    if (!paymentQrId || paymentQrId.length > 128) {
+      return json({ error: "Pilih QRIS yang akan digunakan." }, 400);
+    }
+    const qr = await env.DB.prepare(
+      "SELECT name, image FROM business_payment_qrs WHERE business_id = ? AND id = ? AND is_enabled = 1"
+    ).bind(businessId, paymentQrId).first();
+    if (!qr?.image || body.qrisConfirmed !== true) {
       return json({ error: "QRIS belum siap atau pembayaran belum dikonfirmasi." }, 400);
     }
+    paymentLabel = qr.name;
   }
 
   // Ambil ulang harga dan stok dari D1; data harga/total dari browser tidak dipercaya.
@@ -1196,8 +1287,8 @@ async function transactionsApi(request, env, businessId) {
   const transactionId = `TRX-${crypto.randomUUID()}`;
   const statements = [
     env.DB.prepare(
-      "INSERT INTO transactions (id, business_id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).bind(transactionId, businessId, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member ? 1 : 0, paymentMethod),
+      "INSERT INTO transactions (id, business_id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member, payment_method, payment_label) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(transactionId, businessId, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member ? 1 : 0, paymentMethod, paymentLabel),
   ];
   for (const item of verified) {
     statements.push(
@@ -1223,6 +1314,7 @@ async function transactionsApi(request, env, businessId) {
       dibayar,
       kembalian,
       metodePembayaran: paymentMethod,
+      labelPembayaran: paymentLabel,
       member,
       items: verified.map((item) => ({ kode: item.code, nama: item.name, harga: item.price, qty: item.qty })),
     },

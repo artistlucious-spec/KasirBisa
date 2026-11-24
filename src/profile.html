@@ -112,30 +112,6 @@
       </form>
     </section>
 
-    <section class="profile-card qris-settings-card" aria-labelledby="qris-settings-title">
-      <form id="form-qris">
-        <h2 id="qris-settings-title">QRIS toko</h2>
-        <p class="qris-settings-description">Unggah QRIS milik usaha Anda. Saat pelanggan membayar, periksa pembayaran di aplikasi bank atau penyedia QRIS Anda.</p>
-        <div class="qris-settings-row">
-          <div class="qris-profile-preview">
-            <img id="qris-pratinjau" alt="Pratinjau QRIS toko" hidden>
-            <span id="qris-pratinjau-kosong">QRIS belum diunggah</span>
-          </div>
-          <div class="qris-settings-upload">
-            <label for="qris-gambar">Gambar QRIS</label>
-            <input id="qris-gambar" type="file" accept="image/jpeg,image/png,image/webp">
-            <small>JPG, PNG, atau WebP. Maksimal 100 KB agar kode mudah dipindai.</small>
-            <button id="hapus-qris" class="secondary-button" type="button" hidden>Hapus gambar QRIS</button>
-          </div>
-        </div>
-        <label class="member-option qris-enable-option">
-          <input id="aktifkan-qris" type="checkbox">
-          <span>Aktifkan QRIS di halaman kasir</span>
-        </label>
-        <p id="status-qris" class="profile-status" role="status" aria-live="polite"></p>
-        <button id="simpan-qris" class="primary-button" type="submit" disabled>Simpan pengaturan QRIS</button>
-      </form>
-    </section>
   </main>
 
   <script src="scripts/navigation.js"></script>

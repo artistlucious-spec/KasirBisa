@@ -197,7 +197,7 @@ function renderTransactions() {
       <td>${escapeHtml(item.businessName)}<small class="admin-cell-subtitle">@${escapeHtml(item.username)}</small></td>
       <td class="admin-id-cell">${escapeHtml(item.id)}</td>
       <td>${Number(item.itemCount) || 0}</td>
-      <td>${item.paymentMethod === "qris" ? "QRIS" : "Tunai"}</td>
+      <td>${escapeHtml(item.paymentMethod === "qris" ? (item.paymentLabel || "QRIS") : "Tunai")}</td>
       <td>${money(item.total)}</td>
       <td><button class="secondary-button admin-account-action" type="button" data-transaction-detail="${index}">Lihat</button></td>
     </tr>`).join("");
@@ -213,11 +213,11 @@ function renderPayments() {
     <tr>
       <td>${escapeHtml(item.businessName)}</td>
       <td>@${escapeHtml(item.username)}</td>
-      <td><span class="admin-status-badge ${item.hasImage ? "active" : "inactive"}">${item.hasImage ? "Tersimpan" : "Belum ada"}</span></td>
+      <td><span class="admin-status-badge ${item.hasImage ? "active" : "inactive"}">${item.hasImage ? `${Number(item.qrCount) || 0} tersimpan` : "Belum ada"}</span></td>
       <td><span class="admin-status-badge ${item.qrisEnabled ? "active" : "inactive"}">${item.qrisEnabled ? "Aktif" : "Nonaktif"}</span></td>
       <td class="admin-actions-cell">
         ${item.hasImage ? `<button class="secondary-button admin-account-action" type="button" data-payment-view="${index}">Lihat QR</button>` : ""}
-        <button class="${item.qrisEnabled ? "secondary-button" : "primary-button"} admin-account-action" type="button" data-payment-toggle="${index}" ${item.qrisEnabled || item.hasImage ? "" : "disabled"}>${item.qrisEnabled ? "Nonaktifkan QRIS" : "Aktifkan QRIS"}</button>
+        <button class="${item.qrisEnabled ? "secondary-button" : "primary-button"} admin-account-action" type="button" data-payment-toggle="${index}" ${item.hasImage ? "" : "disabled"}>${item.qrisEnabled ? "Nonaktifkan semua" : "Aktifkan semua"}</button>
       </td>
     </tr>`).join("");
 }
@@ -414,7 +414,7 @@ async function showTransaction(index) {
     content.innerHTML = `
       <p><strong>Usaha:</strong> ${escapeHtml(detail.business_name)} (@${escapeHtml(detail.username)})</p>
       <p><strong>Waktu:</strong> ${escapeHtml(formatDate(detail.waktu, true))}</p>
-      <p><strong>Metode:</strong> ${detail.paymentMethod === "qris" ? "QRIS" : "Tunai"} · <strong>Member:</strong> ${detail.member ? "Ya" : "Tidak"}</p>
+      <p><strong>Metode:</strong> ${escapeHtml(detail.paymentMethod === "qris" ? (detail.paymentLabel || "QRIS") : "Tunai")} · <strong>Member:</strong> ${detail.member ? "Ya" : "Tidak"}</p>
       <div class="admin-table-scroll"><table class="admin-table admin-detail-table">
         <thead><tr><th>Produk</th><th>Jumlah</th><th>Harga</th><th>Subtotal</th></tr></thead>
         <tbody>${detail.items.map((product) => `<tr><td>${escapeHtml(product.name)}<small class="admin-cell-subtitle">${escapeHtml(product.code)}</small></td><td>${Number(product.qty)}</td><td>${money(product.price)}</td><td>${money(product.price * product.qty)}</td></tr>`).join("")}</tbody>
@@ -442,11 +442,28 @@ async function showPaymentQr(index) {
   try {
     const params = new URLSearchParams({ resource: "payment", businessId: item.businessId });
     const detail = await requestJson(`/api/admin/data?${params}`);
-    const image = detail.qrisImage || "";
-    if (!/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(image)) {
-      throw new Error("Data QR usaha tidak memiliki format gambar yang dapat ditampilkan.");
+    content.replaceChildren();
+    if (!Array.isArray(detail.qrs) || !detail.qrs.length) {
+      content.textContent = "Usaha ini belum menyimpan QRIS.";
+      return;
     }
-    content.innerHTML = `<p>QRIS ${detail.qrisEnabled ? "aktif" : "nonaktif"}</p><img class="admin-qr-image" src="${image}" alt="QR pembayaran milik ${escapeHtml(detail.businessName)}">`;
+    for (const qr of detail.qrs) {
+      if (!/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(qr.image || "")) {
+        throw new Error("Data QR usaha tidak memiliki format gambar yang dapat ditampilkan.");
+      }
+      const entry = document.createElement("section");
+      entry.className = "admin-qr-entry";
+      const title = document.createElement("h3");
+      title.textContent = qr.name;
+      const status = document.createElement("p");
+      status.textContent = qr.enabled ? "Aktif di kasir" : "Nonaktif";
+      const image = document.createElement("img");
+      image.className = "admin-qr-image";
+      image.src = qr.image;
+      image.alt = `QRIS ${qr.name} milik ${detail.businessName}`;
+      entry.append(title, status, image);
+      content.appendChild(entry);
+    }
   } catch (error) {
     content.textContent = error.message || "QR tidak dapat dimuat.";
   }
@@ -456,7 +473,7 @@ async function togglePayment(index, button) {
   const item = states.payments.items[index];
   if (!item) return;
   const nextEnabled = !item.qrisEnabled;
-  if (!window.confirm(`${nextEnabled ? "Aktifkan" : "Nonaktifkan"} QRIS untuk usaha ${item.businessName}?`)) return;
+  if (!window.confirm(`${nextEnabled ? "Aktifkan" : "Nonaktifkan"} semua QRIS untuk usaha ${item.businessName}?`)) return;
   button.disabled = true;
   try {
     await requestJson("/api/admin/data?resource=payments", {
@@ -465,7 +482,7 @@ async function togglePayment(index, button) {
       body: JSON.stringify({ businessId: item.businessId, qrisEnabled: nextEnabled }),
     });
     await loadResource("payments", true);
-    showStatus(`QRIS berhasil ${nextEnabled ? "diaktifkan" : "dinonaktifkan"}.`);
+    showStatus(`Semua QRIS berhasil ${nextEnabled ? "diaktifkan" : "dinonaktifkan"}.`);
   } catch (error) {
     button.disabled = false;
     showStatus(error.message || "Pengaturan QRIS tidak dapat diubah.", true);
