@@ -138,6 +138,9 @@ async function loadAccounts(reset = false) {
   if (state.query) params.set("q", state.query);
   try {
     const data = await requestJson(`/api/admin/accounts?${params}`);
+    if (!Array.isArray(data.accounts)) {
+      throw new Error("Format daftar akun tidak sesuai. Pastikan API admin/accounts dan worker.js versi terbaru sudah di-deploy.");
+    }
     state.items = reset ? data.accounts : [...state.items, ...data.accounts];
     state.total = Number(data.total) || 0;
     state.offset += data.accounts.length;
@@ -272,6 +275,9 @@ async function loadResource(resource, reset = false) {
   if (state.query) params.set("q", state.query);
   try {
     const data = await requestJson(`/api/admin/data?${params}`);
+    if (!Array.isArray(data.items)) {
+      throw new Error("Format data admin tidak sesuai. Pastikan API /api/admin/data dan worker.js versi terbaru sudah di-deploy bersama halaman.");
+    }
     state.items = reset ? data.items : [...state.items, ...data.items];
     state.total = Number(data.total) || 0;
     state.offset += data.items.length;
