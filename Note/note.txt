@@ -1,0 +1,3 @@
+@Lita Lusiyanti, S.Kom saya agak bingung sekarang, saya disini mau ganti nama opsi qris dengan nama pembayaran qr. jadi disini pengguna bisa tambah qr sendiri bukan cuma 1 contohnya bisa tambah qr dana, qr gopai dan lain lain.
+
+tapi dipikir pikir ini gak efisien

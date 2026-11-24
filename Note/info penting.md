@@ -58,6 +58,8 @@ Jika guru ingin mempunyai alamat website yang berbeda, buat project Pages dan D1
    npm run d1:migrate:remote
    ```
 
+   Kode/deploy tidak otomatis membuat tabel baru di D1. Untuk menerapkan migrasi terbaru dari folder project ini secara langsung, perintahnya `npx wrangler d1 migrations apply kasirbisa --remote` (database target harus diverifikasi lebih dahulu). Migrasi multi-QR `0009_multiple_payment_qrs.sql` akan dijalankan melalui perintah migrations ini, bukan dengan membuat tabel manual.
+
 6. Deploy ke project Pages. Perintah `npm run deploy` saat ini menargetkan project dengan nama persis `kasirbisa`. Jika project Pages baru mempunyai nama lain agar alamat websitenya berbeda, ubah nama target pada skrip `deploy` di `package.json`, atau jalankan:
 
    ```powershell
@@ -94,3 +96,10 @@ Jalankan migrasi remote **hanya** setelah `database_id` menunjuk ke database bar
 - Untuk mengelola akun online, atur `ADMIN_USERNAME` pada environment Cloudflare Pages, terapkan migrasi `0008_admin_accounts.sql` ke D1 produksi yang benar, lalu deploy versi source yang memuat halaman admin.
 - Username akun admin tidak dapat diubah melalui halaman Profil agar akun lain tidak bisa mengambil hak admin setelah username lama dilepas.
 - Halaman admin hanya mengelola akun pada D1 yang terhubung ke environment tersebut. Jangan jalankan migrasi remote sebelum memastikan project Cloudflare dan ID D1 yang dituju.
+
+### Jika tab Admin menampilkan “Format data admin tidak sesuai”
+
+- Pesan ini berarti API mengembalikan bentuk data yang tidak diharapkan; error ditangkap dan ditampilkan di halaman, jadi console browser dapat tetap tanpa stack trace.
+- Periksa endpoint `/api/admin/data?resource=products` di tab Network. Jika responsnya halaman HTML (`text/html`) alih-alih JSON, route Pages Function belum disertakan atau belum aktif pada deployment.
+- Pastikan deployment menyertakan `functions/api/admin/data.js`, `worker.js`, dan aset `src/` dari source/branch yang sama. Jika memakai Git integration, pastikan file Functions ada pada branch yang benar. Jika deploy manual, jalankan perintah deploy dari root project dengan folder `functions` tersedia.
+- Setelah deployment, tanpa sesi login endpoint seharusnya merespons JSON `401`, bukan halaman HTML `200`. Masalah route ini tidak diperbaiki dengan mengubah `ADMIN_USERNAME`.
