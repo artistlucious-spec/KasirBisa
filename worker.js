@@ -1,5 +1,6 @@
 // Backend bersama untuk semua route Pages: autentikasi, produk, transaksi, dan insight.
 const MAX_PRODUCT_IMAGE_LENGTH = 140 * 1024;
+const MAX_QRIS_IMAGE_LENGTH = 140 * 1024;
 const AUTH_COOKIE_NAME = "kasir_bisa_session";
 const AUTH_SESSION_SECONDS = 12 * 60 * 60;
 const PASSWORD_HASH_ITERATIONS = 100_000;
@@ -8,7 +9,7 @@ const textEncoder = new TextEncoder();
 const USER_SELECT = `SELECT
   users.id, users.business_id, users.username, users.whatsapp,
   users.password_hash, users.password_salt, users.password_iterations,
-  users.password_encrypted, users.profile_image, users.session_version,
+  users.password_encrypted, users.profile_image, users.session_version, users.is_active,
   businesses.name AS business_name
   FROM users JOIN businesses ON businesses.id = users.business_id`;
 
@@ -22,6 +23,16 @@ function json(data, status = 200, extraHeaders = {}) {
 function sessionSecretConfigured(env) {
   return typeof env.AUTH_SESSION_SECRET === "string"
     && env.AUTH_SESSION_SECRET.length >= 32;
+}
+
+function isAdminUser(user, env) {
+  const configuredUsername = typeof env.ADMIN_USERNAME === "string" ? env.ADMIN_USERNAME.trim() : "";
+  return Boolean(
+    user
+    && configuredUsername
+    && configuredUsername.length <= 128
+    && user.username.toLowerCase() === configuredUsername.toLowerCase()
+  );
 }
 
 function bootstrapCredentialsConfigured(env) {
@@ -226,7 +237,11 @@ async function getSessionUser(request, env) {
   if (!valid) return null;
 
   const user = await getUserById(env, userId);
-  return user && version === String(user.session_version) ? user : null;
+  return user
+    && Number(user.is_active) === 1
+    && version === String(user.session_version)
+    ? user
+    : null;
 }
 
 function cookieHeaders(request, token, maxAge) {
@@ -337,7 +352,7 @@ async function authApi(request, env, pathname) {
     const passwordMatches = user
       ? await verifyPassword(password, user)
       : await derivePasswordHash(password, new Uint8Array(16), PASSWORD_HASH_ITERATIONS);
-    if (!user || !passwordMatches) {
+    if (!user || Number(user.is_active) !== 1 || !passwordMatches) {
       return json({ error: "Nama pengguna atau password salah." }, 401);
     }
 
@@ -358,7 +373,12 @@ async function authApi(request, env, pathname) {
     const user = await getSessionUser(request, env);
     return json({
       authenticated: Boolean(user),
-      ...(user ? { username: user.username, businessName: user.business_name, profileImage: user.profile_image || "" } : {}),
+      ...(user ? {
+        username: user.username,
+        businessName: user.business_name,
+        profileImage: user.profile_image || "",
+        isAdmin: isAdminUser(user, env),
+      } : {}),
     });
   }
 
@@ -400,6 +420,9 @@ async function authApi(request, env, pathname) {
     const profileImage = hasImage ? body.profileImage : null;
     if (!username || username.length > 128 || currentPassword.length > 256) {
       return json({ error: "Nama pengguna atau password tidak valid." }, 400);
+    }
+    if (username.toLowerCase() !== user.username.toLowerCase() && isAdminUser(user, env)) {
+      return json({ error: "Nama pengguna akun admin tidak dapat diubah dari halaman profil." }, 400);
     }
     if (hasBusinessName && (!businessName || businessName.length > 120)) {
       return json({ error: "Nama toko wajib diisi dan maksimal 120 karakter." }, 400);
@@ -471,6 +494,93 @@ async function authApi(request, env, pathname) {
   return json({ error: "Endpoint autentikasi tidak ditemukan." }, 404);
 }
 
+async function adminAccountsApi(request, env, adminUser) {
+  if (request.method === "GET") {
+    const url = new URL(request.url);
+    const search = (url.searchParams.get("q") || "").trim().slice(0, 100);
+    const offsetValue = Number(url.searchParams.get("offset") || 0);
+    if (!Number.isSafeInteger(offsetValue) || offsetValue < 0 || offsetValue > 1_000_000) {
+      return json({ error: "Halaman akun tidak valid." }, 400);
+    }
+
+    const where = search
+      ? "WHERE instr(lower(users.username), lower(?)) > 0 OR instr(lower(businesses.name), lower(?)) > 0"
+      : "";
+    const searchBindings = search ? [search, search] : [];
+    const [count, summary, result] = await Promise.all([
+      env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM users JOIN businesses ON businesses.id = users.business_id
+         ${where}`
+      ).bind(...searchBindings).first(),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS total,
+          COALESCE(SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END), 0) AS active,
+          COALESCE(SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END), 0) AS disabled
+         FROM users`
+      ).first(),
+      env.DB.prepare(
+        `SELECT users.id, users.username, users.created_at, users.is_active,
+          businesses.name AS business_name,
+          (SELECT COUNT(*) FROM products WHERE products.business_id = users.business_id) AS product_count,
+          (SELECT COUNT(*) FROM transactions WHERE transactions.business_id = users.business_id) AS transaction_count
+         FROM users JOIN businesses ON businesses.id = users.business_id
+         ${where}
+         ORDER BY users.created_at DESC, users.id
+         LIMIT 50 OFFSET ?`
+      ).bind(...searchBindings, offsetValue).all(),
+    ]);
+
+    return json({
+      accounts: (result.results || []).map((account) => ({
+        id: account.id,
+        username: account.username,
+        businessName: account.business_name,
+        createdAt: account.created_at,
+        active: Number(account.is_active) === 1,
+        isAdmin: isAdminUser(account, env),
+        productCount: Number(account.product_count) || 0,
+        transactionCount: Number(account.transaction_count) || 0,
+      })),
+      total: Number(count?.total) || 0,
+      offset: offsetValue,
+      limit: 50,
+      summary: {
+        total: Number(summary?.total) || 0,
+        active: Number(summary?.active) || 0,
+        disabled: Number(summary?.disabled) || 0,
+      },
+    });
+  }
+
+  if (request.method === "PATCH") {
+    const body = await parseJsonBody(request);
+    const userId = typeof body?.userId === "string" ? body.userId : "";
+    if (!/^[\w-]{1,128}$/.test(userId) || typeof body?.active !== "boolean") {
+      return json({ error: "Perubahan status akun tidak valid." }, 400);
+    }
+
+    const target = await env.DB.prepare(
+      "SELECT id, username, is_active FROM users WHERE id = ?"
+    ).bind(userId).first();
+    if (!target) return json({ error: "Akun tidak ditemukan." }, 404);
+    if (target.id === adminUser.id || isAdminUser(target, env)) {
+      return json({ error: "Akun admin utama tidak dapat dinonaktifkan dari halaman ini." }, 400);
+    }
+    if ((Number(target.is_active) === 1) === body.active) {
+      return json({ success: true, active: body.active, unchanged: true });
+    }
+
+    const result = await env.DB.prepare(
+      "UPDATE users SET is_active = ?, session_version = session_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+    ).bind(body.active ? 1 : 0, target.id).run();
+    if (!result.meta.changes) return json({ error: "Status akun tidak berhasil diperbarui." }, 500);
+    return json({ success: true, active: body.active });
+  }
+
+  return json({ error: "Metode tidak didukung." }, 405, { Allow: "GET, PATCH" });
+}
+
 function validProductImage(image) {
   // Gambar yang disimpan di D1 dibatasi ke data URL WebP kecil hasil kompresi browser.
   return typeof image === "string"
@@ -517,6 +627,46 @@ function rupiah(value) {
   return `Rp${Number(value || 0).toLocaleString("id-ID")}`;
 }
 
+function validQrisImage(image) {
+  return typeof image === "string"
+    && image.length <= MAX_QRIS_IMAGE_LENGTH
+    && (image === "" || /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(image));
+}
+
+async function paymentSettingsApi(request, env, businessId) {
+  if (request.method === "GET") {
+    const settings = await env.DB.prepare(
+      "SELECT qris_enabled, qris_image FROM business_payment_settings WHERE business_id = ?"
+    ).bind(businessId).first();
+    return json({
+      qrisEnabled: Boolean(settings?.qris_enabled),
+      qrisImage: settings?.qris_image || "",
+    });
+  }
+  if (request.method !== "PUT") return json({ error: "Method tidak didukung" }, 405);
+
+  const body = await parseJsonBody(request);
+  if (!body || typeof body.qrisEnabled !== "boolean" || typeof body.qrisImage !== "string") {
+    return json({ error: "Pengaturan pembayaran tidak valid." }, 400);
+  }
+  if (!validQrisImage(body.qrisImage)) {
+    return json({ error: "Gambar QRIS tidak valid atau terlalu besar." }, 400);
+  }
+  if (body.qrisEnabled && !body.qrisImage) {
+    return json({ error: "Unggah gambar QRIS sebelum mengaktifkannya." }, 400);
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO business_payment_settings (business_id, qris_enabled, qris_image)
+     VALUES (?, ?, ?)
+     ON CONFLICT(business_id) DO UPDATE SET
+       qris_enabled = excluded.qris_enabled,
+       qris_image = excluded.qris_image,
+       updated_at = CURRENT_TIMESTAMP`
+  ).bind(businessId, body.qrisEnabled ? 1 : 0, body.qrisImage).run();
+  return json({ success: true, qrisEnabled: body.qrisEnabled, qrisImage: body.qrisImage });
+}
+
 async function getProducts(env, businessId) {
   const result = await env.DB.prepare(
     "SELECT id, code, barcode, name, category, price, stock, image FROM products WHERE business_id = ? ORDER BY name"
@@ -535,7 +685,7 @@ async function getProducts(env, businessId) {
 
 async function getTransactions(env, businessId) {
   const result = await env.DB.prepare(
-    "SELECT id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member FROM transactions WHERE business_id = ? ORDER BY waktu DESC"
+    "SELECT id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member, payment_method FROM transactions WHERE business_id = ? ORDER BY waktu DESC"
   ).bind(businessId).all();
   const transactions = [];
   for (const row of result.results || []) {
@@ -551,6 +701,7 @@ async function getTransactions(env, businessId) {
       total: row.total,
       dibayar: row.dibayar,
       kembalian: row.kembalian,
+      metodePembayaran: row.payment_method || "tunai",
       member: Boolean(row.member),
       items: (items.results || []).map((item) => ({
         kode: item.kode,
@@ -641,10 +792,24 @@ async function transactionsApi(request, env, businessId) {
 
   const body = await request.json();
   const items = Array.isArray(body.items) ? body.items : [];
-  const dibayar = Number(body.dibayar);
+  const paymentMethod = body.paymentMethod === undefined ? "tunai" : body.paymentMethod;
+  const dibayarInput = Number(body.dibayar);
   const member = Boolean(body.member);
   if (!items.length) return json({ error: "Keranjang masih kosong" }, 400);
-  if (!Number.isSafeInteger(dibayar) || dibayar < 0) return json({ error: "Jumlah pembayaran tidak valid" }, 400);
+  if (!["tunai", "qris"].includes(paymentMethod)) {
+    return json({ error: "Metode pembayaran tidak valid." }, 400);
+  }
+  if (paymentMethod === "tunai" && (!Number.isSafeInteger(dibayarInput) || dibayarInput < 0)) {
+    return json({ error: "Jumlah pembayaran tidak valid" }, 400);
+  }
+  if (paymentMethod === "qris") {
+    const settings = await env.DB.prepare(
+      "SELECT qris_enabled, qris_image FROM business_payment_settings WHERE business_id = ?"
+    ).bind(businessId).first();
+    if (!settings?.qris_enabled || !settings.qris_image || body.qrisConfirmed !== true) {
+      return json({ error: "QRIS belum siap atau pembayaran belum dikonfirmasi." }, 400);
+    }
+  }
 
   // Ambil ulang harga dan stok dari D1; data harga/total dari browser tidak dipercaya.
   const verified = [];
@@ -670,14 +835,15 @@ async function transactionsApi(request, env, businessId) {
       : 0;
   const ppn = Math.floor(((subtotal - diskon) * 11 + 50) / 100);
   const total = subtotal - diskon + ppn;
+  const dibayar = paymentMethod === "qris" ? total : dibayarInput;
   if (dibayar < total) return json({ error: "Uang pembayaran kurang" }, 400);
   const kembalian = dibayar - total;
   const waktu = new Date().toISOString();
   const transactionId = `TRX-${crypto.randomUUID()}`;
   const statements = [
     env.DB.prepare(
-      "INSERT INTO transactions (id, business_id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).bind(transactionId, businessId, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member ? 1 : 0),
+      "INSERT INTO transactions (id, business_id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(transactionId, businessId, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member ? 1 : 0, paymentMethod),
   ];
   for (const item of verified) {
     statements.push(
@@ -702,6 +868,7 @@ async function transactionsApi(request, env, businessId) {
       total,
       dibayar,
       kembalian,
+      metodePembayaran: paymentMethod,
       member,
       items: verified.map((item) => ({ kode: item.code, nama: item.name, harga: item.price, qty: item.qty })),
     },
@@ -1231,8 +1398,15 @@ export default {
         if (!user) {
           return json({ error: "Sesi login tidak valid. Silakan masuk kembali." }, 401);
         }
+        if (url.pathname === "/api/admin/accounts") {
+          if (!isAdminUser(user, env)) return json({ error: "Akses admin tidak diizinkan." }, 403);
+          return await adminAccountsApi(request, env, user);
+        }
         if (url.pathname === "/api/products" || url.pathname.startsWith("/api/products/")) {
           return await productsApi(request, env, url.pathname, user.business_id);
+        }
+        if (url.pathname === "/api/payment-settings") {
+          return await paymentSettingsApi(request, env, user.business_id);
         }
         if (url.pathname === "/api/transactions") {
           return await transactionsApi(request, env, user.business_id);

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1565c0">
+  <title>Admin - Kasir Bisa</title>
+  <script src="scripts/auth-guard.js"></script>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="icon" type="image/png" href="icon/Favicon.png">
+</head>
+<body class="halaman-admin">
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Kasir Bisa, kembali ke kasir">
+      <img class="brand-logo" src="icon/Favicon.png" alt="" aria-hidden="true">
+      <span><strong>Kasir Bisa</strong><small>Pengelolaan aplikasi</small></span>
+    </a>
+    <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Buka menu" aria-controls="site-menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <nav id="site-menu" class="header-nav" aria-label="Navigasi utama" hidden>
+      <a class="header-link" href="index.html">Kasir</a>
+      <a class="header-link" href="produk.html">Produk &amp; Stok</a>
+      <a class="header-link" href="riwayat.html">Riwayat Transaksi</a>
+      <a class="header-link" href="profile.html">Profil Usaha</a>
+      <button id="tombol-keluar" class="header-link logout-button" type="button">Keluar</button>
+    </nav>
+  </header>
+
+  <main class="admin-main">
+    <section class="admin-heading">
+      <p class="eyebrow">PENGELOLA APLIKASI</p>
+      <h1>Kelola akun usaha</h1>
+      <p>Lihat ringkasan akun dan aktifkan atau nonaktifkan akses. Data password dan rincian transaksi tidak ditampilkan.</p>
+    </section>
+
+    <p id="admin-status" class="notice" role="status" aria-live="polite">Memeriksa akses admin...</p>
+
+    <section id="admin-dashboard" hidden>
+      <div class="admin-summary" aria-label="Ringkasan akun">
+        <article class="admin-summary-card"><span>Semua akun</span><strong id="jumlah-akun">0</strong></article>
+        <article class="admin-summary-card"><span>Akun aktif</span><strong id="jumlah-aktif">0</strong></article>
+        <article class="admin-summary-card"><span>Akun nonaktif</span><strong id="jumlah-nonaktif">0</strong></article>
+      </div>
+
+      <section class="admin-panel" aria-labelledby="admin-accounts-title">
+        <div class="admin-panel-heading">
+          <div>
+            <h2 id="admin-accounts-title">Daftar akun</h2>
+            <p>Gunakan nama usaha atau nama pengguna untuk mencari akun.</p>
+          </div>
+          <button id="admin-refresh" class="secondary-button admin-refresh" type="button">Muat ulang</button>
+        </div>
+        <label class="admin-search-label" for="admin-search">Cari akun
+          <input id="admin-search" type="search" maxlength="100" placeholder="Nama usaha atau nama pengguna">
+        </label>
+        <div class="admin-table-scroll">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th scope="col">Usaha</th>
+                <th scope="col">Nama pengguna</th>
+                <th scope="col">Bergabung</th>
+                <th scope="col">Produk / transaksi</th>
+                <th scope="col">Status</th>
+                <th scope="col">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="admin-account-list">
+              <tr><td class="admin-empty" colspan="6">Memuat akun...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p id="admin-result-count" class="admin-result-count"></p>
+        <button id="admin-load-more" class="secondary-button admin-load-more" type="button" hidden>Muat akun berikutnya</button>
+      </section>
+    </section>
+  </main>
+
+  <script src="scripts/navigation.js"></script>
+  <script src="scripts/admin.js"></script>
+</body>
+</html>

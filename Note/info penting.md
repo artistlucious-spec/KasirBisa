@@ -85,3 +85,12 @@ Jalankan migrasi remote **hanya** setelah `database_id` menunjuk ke database bar
 - Jangan kirim `.dev.vars`, API key, `AUTH_SESSION_SECRET`, password, atau token.
 - Jangan sertakan folder `.wrangler/` karena dapat memuat database lokal dan state akun.
 - Untuk uji coba guru, gunakan database D1 kosong milik guru, bukan database produksi pemilik aplikasi.
+
+## Mengaktifkan halaman admin
+
+- Halaman Admin menggunakan akun Kasir Bisa yang sudah ada; tidak perlu Gmail atau akun admin terpisah.
+- Setelah akun yang akan menjadi admin sudah terdaftar, isi `ADMIN_USERNAME` di `.dev.vars` (lokal) atau environment Cloudflare Pages (online) dengan username akun itu.
+- Untuk pengembangan lokal, jalankan `npm run d1:migrate:local` setelah mengatur `.dev.vars`.
+- Untuk mengelola akun online, atur `ADMIN_USERNAME` pada environment Cloudflare Pages, terapkan migrasi `0008_admin_accounts.sql` ke D1 produksi yang benar, lalu deploy versi source yang memuat halaman admin.
+- Username akun admin tidak dapat diubah melalui halaman Profil agar akun lain tidak bisa mengambil hak admin setelah username lama dilepas.
+- Halaman admin hanya mengelola akun pada D1 yang terhubung ke environment tersebut. Jangan jalankan migrasi remote sebelum memastikan project Cloudflare dan ID D1 yang dituju.

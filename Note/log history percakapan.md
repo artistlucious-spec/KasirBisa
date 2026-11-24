@@ -1,0 +1,111 @@
+**rangkum semua percakapan disini tanpa terkecualiagar bisa digunakan dan jangan timpa informasi yg sudah ada. ketik dan lanjutkan dalam list berikut**
+
+**history :**
+1. Pengguna meminta migrasi aplikasi Flutter Kasir Bisa menjadi versi web dengan nama yang tetap.
+2. Ruang kerja dipersiapkan agar implementasi lengkap berada di folder `kasir bisa web`, sedangkan folder induk `KASIR BISA` tetap bersih dari file website.
+3. Desain dipertahankan bernuansa biru; bagian atas situs dibuat untuk pemindai dan transaksi, sedangkan bagian bawah dibuat untuk katalog dan pengelolaan produk manual.
+4. Login awal dirancang sebagai satu akun pemilik; tidak disediakan pendaftaran akun publik.
+5. Disepakati bahwa data harus permanen memakai Cloudflare D1, bukan `localStorage`.
+6. Cloudflare Pages dipilih untuk hosting, Pages Functions untuk API, dan Gemini dipilih untuk fitur Smart Insight.
+7. D1 digunakan untuk menyimpan produk, transaksi, item transaksi, foto, profil pemilik, dan data lain yang diperlukan aplikasi.
+8. Migrasi awal dibuat untuk tabel `products`, `transactions`, dan `transaction_items`.
+9. API produk, transaksi, rekap, dan Smart Insight dipindahkan ke Cloudflare Pages Functions serta handler bersama `worker.js`.
+10. Foto produk ditambahkan dengan unggah JPG/PNG/WebP, pratinjau, penghapusan, kompresi WebP, dan penyimpanan sebagai data gambar dalam D1.
+11. Efek suara transaksi `buy.mp3` ditambahkan dan diputar setelah server memastikan pembayaran berhasil.
+12. Halaman [panduan.html](../src/panduan.html) dibuat sebagai dokumentasi penggunaan yang dapat dibuka dari website.
+13. Login awal memakai secret Cloudflare `KASIR_USERNAME`, `KASIR_PASSWORD`, dan `AUTH_SESSION_SECRET`, cookie `HttpOnly`, sesi 12 jam, serta perlindungan endpoint `/api/*`.
+14. Pengguna meminta agar username, password, dan foto profil dapat diubah dari halaman Profil.
+15. Dibuat tabel `owner_profile` untuk profil tunggal pemilik beserta hash password, salt, jumlah iterasi, foto profil, dan versi sesi.
+16. Dibuat halaman Profil, kompresi foto bersama untuk foto produk dan profil, serta menu navigasi hamburger tiga garis.
+17. Menu hamburger diterapkan pada halaman Kasir, Rekap, Smart Insight, Panduan, dan Profil beserta tautan logout.
+18. Dokumentasi proyek dibuat dalam folder `docs/`: kebutuhan sistem, arsitektur, database, fitur, dan panduan pengguna.
+19. `README.md` dan `CHANGELOG.md` diperbarui untuk mencatat struktur, konfigurasi, fitur, serta perubahan penting.
+20. Log kerja terpisah dibuat untuk membantu melacak aktivitas migrasi, deploy, dan debugging.
+21. Terjadi kebingungan antara project Pages `kasir-bisa` dan `kasirbisa`; keduanya tidak boleh dianggap identik.
+22. Terjadi kebingungan database D1 karena nama dan ID database yang digunakan tidak sama antara konfigurasi lama, konfigurasi baru, dan binding project.
+23. Cloudflare mengonfirmasi bahwa project Pages yang aktif untuk screenshot pengguna bernama `kasirbisa` dan memiliki empat secret/variables: `AUTH_SESSION_SECRET`, `GEMINI_API_KEY`, `KASIR_PASSWORD`, dan `KASIR_USERNAME`.
+24. Screenshot juga menunjukkan binding D1 bernama `DB`, tetapi dialog binding tidak menampilkan nama atau ID database terpilih secara lengkap pada saat itu.
+25. Deploy awal berhasil mengunggah aset, tetapi gagal memublikasikan Functions ketika ID D1 yang ditulis konfigurasi tidak ditemukan pada akun deployment.
+26. Migrasi profil sempat diterapkan pada database yang terbaca dari konfigurasi lokal, tetapi bukan berarti database itu adalah database yang terikat ke project Pages `kasirbisa`.
+27. Pengecekan endpoint `/api/auth/session` pada preview deployment menemukan bahwa tabel `owner_profile` belum tersedia pada database yang dijangkau website.
+28. Disarankan untuk membuat tabel melalui SQL migrasi `0003_owner_profile.sql`, tetapi ini tidak boleh dilakukan pada database yang salah.
+29. Deploy kemudian berhasil menayangkan halaman login, dan pengecekan browser menunjukkan request login kembali menerima HTTP 500.
+30. Pengecekan endpoint status yang tepat menemukan detail error `Pbkdf2 failed: iteration counts above 100000 are not supported (requested 310000)`.
+31. Penyebab login gagal adalah implementasi password memakai 310.000 iterasi PBKDF2, sedangkan platform Cloudflare Workers yang dipakai membatasi PBKDF2 sampai 100.000 iterasi.
+32. Konstanta `PASSWORD_HASH_ITERATIONS` diubah dari 310.000 menjadi 100.000.
+33. Validasi hash diperketat agar hanya menerima iterasi yang sesuai dengan implementasi saat ini, yaitu 100.000, bukan jumlah lama atau sembarang jumlah.
+34. Script package diperbarui agar deployment dan migrasi memakai nama project/database yang benar: `kasirbisa`.
+35. `wrangler.toml` diselaraskan dengan binding `DB`, database `kasirbisa`, dan ID database yang diberikan pengguna: `520d3b0f-e730-4a12-ad88-7b68afffce83`.
+36. Dokumentasi arsitektur, kebutuhan sistem, database, dan changelog diperbarui agar mencatat batas 100.000 iterasi serta nama target `kasirbisa`.
+37. Pengecekan sintaks JavaScript untuk `worker.js` dan seluruh file di `src/scripts/` berhasil lulus.
+38. `npm run build` berhasil lulus karena project statis tidak memerlukan proses framework build.
+39. Tes bootstrapping pemilik, hash password 100.000 iterasi, login, dan akses profil menggunakan mock D1 berhasil lulus.
+40. Pemeriksaan tautan Markdown, aset halaman, dan navigasi hamburger berhasil lulus.
+41. Migrasi SQLite 0001 sampai 0003 berhasil diterapkan dan diverifikasi dalam database memori untuk memastikan tabel serta data seed dapat dibuat.
+42. Pengguna diberi instruksi untuk commit dan push perubahan ke GitHub agar deployment Cloudflare terhubung memakai kode terbaru.
+43. Belum ada langkah remote deployment final yang dapat dikonfirmasi tanpa commit/push atau deployment baru dari project yang benar.
+44. Belum ada bukti bahwa tabel `owner_profile` dan semua migrasi produk/transaksi sudah ada pada database D1 yang benar-benar terikat ke preview terbaru.
+45. Belum ada bukti bahwa login Production berhasil setelah kode 100.000 iterasi diterapkan.
+46. Catatan keamanan: username/password/API key tidak boleh ditulis ke source code, log percakapan, README, atau screenshot yang dibagikan.
+47. Setelah login berhasil, password bootstrap dapat diganti dari halaman Profil setelah memverifikasi password saat ini.
+48. Langkah deployment yang disarankan adalah commit/push source terbaru, menunggu Cloudflare Pages menyelesaikan build, lalu menguji ulang `/api/auth/session` dan halaman login pada deployment terbaru.
+49. Setelah deployment baru berhasil, langkah berikutnya adalah memastikan Cloudflare D1 benar-benar mempunyai tabel `owner_profile` pada database binding `DB`.
+50. Saat login sudah dapat berfungsi, halaman Profil dapat dipakai untuk mengubah username, password, dan foto profil.
+51. Pengguna bertanya apakah login wajib atau opsional untuk aplikasi yang akan dipresentasikan dalam lomba software; pembahasan menekankan bahwa kebutuhan login bergantung pada fitur dan cara aplikasi mengelola data usaha.
+52. Pengguna menjelaskan bahwa versi web awal hanya memiliki login tanpa pendaftaran, padahal aplikasi asal memiliki fitur yang belum seluruhnya terbawa saat migrasi; pengguna meminta agar fitur yang terlewat ditangani.
+53. Pengguna merasa arsitektur yang dibuat membingungkan dan meminta penjelasan dengan cara yang lebih mudah dipahami.
+54. Pengguna melaporkan pendaftaran/signup gagal dan memberikan tangkapan layar serta informasi hasil inspect untuk membantu diagnosis.
+55. Dalam rangkaian debugging, pengguna menyampaikan kebingungan tentang akun yang dapat diotorisasi, deployment GitHub, alasan penggunaan Wrangler, dan tidak ingin menunggu lama. Penjelasan selanjutnya membedakan alur deploy GitHub dari perintah Wrangler manual.
+56. Pengguna bertanya mengenai tab/halaman Yoti yang terlihat; dijelaskan bahwa halaman tersebut tidak digunakan untuk Kasir Bisa dan tidak terkait dengan aplikasi.
+57. Untuk meringkas perubahan agar mudah dipresentasikan, pengguna meminta dokumentasi Markdown yang menjelaskan aktivitas, kode, arsitektur, folder/file, dan fungsi method.
+58. File `aktivitas.md` diperbarui dengan ringkasan kegiatan sebelumnya, termasuk perubahan signup, migrasi data, alur autentikasi, dan poin presentasi.
+59. Dokumen arsitektur panjang baru dibuat di `PANDUAN-ARSITEKTUR.md`. Isinya menjelaskan struktur folder, tugas halaman dan endpoint, alur signup/login/transaksi, fungsi browser dan backend, tabel database, migrasi, konfigurasi, istilah teknis, dan contoh penjelasan presentasi.
+60. Panduan arsitektur mencatat peringatan bahwa konfigurasi lokal `wrangler.toml`/skrip migrasi dan database Pages produksi yang digunakan pada perbaikan sebelumnya memiliki nama/ID berbeda; migrasi remote tidak boleh dijalankan sebelum target diverifikasi.
+61. Berdasarkan catatan pekerjaan setelah daftar sebelumnya, D1 produksi Pages `kasirbisa` dengan ID `520d3b0f-e730-4a12-ad88-7b68afffce83` kemudian dimigrasikan dengan `0004_multi_tenant_accounts.sql`. Migrasi mempertahankan data legacy dan menambahkan pemisahan data berdasarkan usaha.
+62. Signup produksi diuji ke endpoint `/api/auth/signup` dan menghasilkan HTTP 201 dengan `success: true`. Akun/usahanya yang dibuat khusus untuk pengujian kemudian dihapus; catatan pekerjaan menyebut tidak ada akun uji tersisa.
+63. Perbaikan migrasi/signup tersebut dilakukan pada database; tidak ada deploy GitHub yang dilakukan sebagai bagian dari langkah database itu.
+64. Pengguna melihat HTTP 503 berbahasa Inggris pada halaman Smart Insight dan khawatir bahwa itu berbahaya. Dijelaskan bahwa pesan tersebut berasal dari layanan Gemini yang sedang padat, bukan bukti akun/database diretas; aplikasi mengembalikan insight cadangan.
+65. Dijelaskan pula batas data yang dikirim untuk analisis Gemini: fakta/ringkasan usaha seperti total penjualan, produk terlaris, stok menipis, dan jam ramai; password, username, dan nomor WhatsApp tidak dikirim dalam alur analisis tersebut. Secret `GEMINI_API_KEY` dapat dinonaktifkan bila pengguna tidak ingin menggunakan layanan Gemini.
+66. Pengguna meminta pesan error Smart Insight dialihkan ke bahasa Indonesia untuk mencegah salah paham. `worker.js` diperbarui agar status Gemini seperti 400, 401, 403, 404, 429, dan 503 mendapat pesan Indonesia dan tidak lagi menampilkan teks error provider mentah; insight cadangan tetap disertakan.
+67. Perubahan lokalisasi error dicatat di `docs/fitur.md`. Sintaks JavaScript, pemeriksaan build, dan simulasi respons Gemini HTTP 503 berhasil; saat dicatat perubahan tersebut belum di-deploy.
+68. Pengguna bertanya batas ukuran foto pada tombol pilih file. Dijelaskan bahwa file asli maksimal 12 MB, format JPG/PNG/WebP, dan gambar dikompres otomatis ke WebP dengan target sekitar 100 KB.
+69. Pengguna bertanya batas tinggi dan lebar gambar. Dijelaskan bahwa sisi terpanjang dibatasi hingga 512 piksel setelah proses kompresi, dengan rasio gambar dijaga.
+70. Dari tangkapan layar katalog, pengguna melihat produk tanpa foto menampilkan gambar rusak/teks “Gambar tidak tersedia”, lalu meminta saran gambar sederhana untuk pengganti foto kosong.
+71. Disarankan ilustrasi netral berupa kemasan/kotak produk dengan ikon foto kecil, latar biru muda, dan teks “Belum ada foto”; nama file yang disarankan `placeholder-produk.png` di `src/assets/images/`.
+72. Pengguna kemudian menambahkan `src/assets/images/placeholder-produk.png` sendiri dan meminta agar file diperiksa serta dipakai sebagai gambar pengganti.
+73. Gambar tersebut diperiksa: PNG 512 × 512 dengan latar biru dan tanda tanya putih. Secara teknis valid dan cocok dengan palet biru, walaupun tanda tanya dapat bermakna “tidak diketahui” alih-alih “belum ada foto”.
+74. `src/scripts/app.js` diperbarui untuk memakai placeholder saat gambar produk kosong atau foto gagal dimuat, termasuk di katalog dan keranjang. Foto produk yang dipilih tetap dipakai; mekanisme fallback dibuat agar kegagalan placeholder sendiri tidak menimbulkan loop error.
+75. Pemeriksaan sintaks `app.js`, `npm run build`, dan uji perilaku helper gambar berhasil. Uji memverifikasi placeholder untuk foto kosong, foto asli tetap dipakai, fallback saat foto asli gagal, dan tidak terjadi loop jika placeholder juga gagal.
+76. Pengguna bertanya apakah gambar-gambar di `assets/images` sudah tidak berguna dan aman dihapus. Pencarian menunjukkan 14 gambar masih dirujuk oleh data katalog contoh di `src/scripts/kasir.js` dan migrasi `0002_seed_products.sql`, sedangkan `popmiekorea.png` tidak ditemukan rujukannya.
+77. Tidak ada gambar yang dihapus. `placeholder-produk.png` perlu dipertahankan karena dipakai oleh `app.js`; gambar produk contoh dapat dihapus secara teknis tetapi produk contoh akan kehilangan foto aslinya.
+78. Pengguna mengoreksi bahwa pertanyaan tentang penghapusan gambar hanya pertanyaan, bukan permintaan untuk melakukan perubahan; ditegaskan kembali bahwa tidak ada file yang dihapus atau diubah pada giliran tersebut.
+79. Pengguna bertanya mengapa halaman Profil meminta password saat ini jika kolomnya bisa diedit. Dijelaskan bahwa kolom tersebut menerima password lama untuk memverifikasi pemilik akun, sedangkan password baru dimasukkan di kolom password baru dan konfirmasi.
+80. Pengguna menegaskan bahwa kolom “Password saat ini” memang dapat diubah isinya. Klarifikasi: nilai yang diketik di situ hanya menjadi bukti verifikasi saat menyimpan, bukan password baru yang disimpan; untuk mengganti password, isi password lama dan dua kolom password baru.
+81. Pengguna meminta agar instruksi dalam `Note/log history percakapan.md` dijalankan. Instruksi file tersebut adalah melanjutkan rangkuman percakapan sebagai daftar bernomor tanpa menimpa isi lama; entri 51 dan seterusnya ditambahkan untuk merangkum konteks lanjutan.
+82. Pengguna menyadari ikon header belum memakai gambar dan bertanya apakah favicon dapat dipakai atau perlu gambar dengan ukuran lain. Dijelaskan bahwa aset `src/icon/Favicon.png` berukuran 48×48 px cukup untuk slot logo header 42×42 px, dan favicon tab saja tidak otomatis menjadi logo header.
+83. Pengguna meminta ikon dipasangkan dan semua aktivitas dicatat di `log.md`. Ikon gambar awalnya dipasang hanya di `src/index.html` dengan ukuran CSS 42×42 px; perubahan dan verifikasi aset/markup dicatat di log aktivitas.
+84. Pengguna mengoreksi bahwa pemasangan tidak boleh hanya di halaman kasir. Ikon kemudian dipasang secara lokal pada tujuh halaman HTML di `src/` (kasir, login, daftar, rekap, Smart Insight, panduan, profil), mark teks lama diperiksa sudah tidak ada di salinan lokal, dan pekerjaan dicatat di `log.md`.
+85. Setelah pengguna deploy ulang dan masih melihat teks “KB”, situs `https://e2d6929d.kasirbisa.pages.dev/` diperiksa. HTML produksi di halaman kasir, login, dan daftar terbukti masih berisi `<span class="brand-mark">KB</span>`, sementara `/icon/Favicon.png` merespons HTTP 200.
+86. Pemeriksaan konfigurasi dan GitHub menunjukkan Cloudflare Pages menggunakan `pages_build_output_dir = "./src"`. File HTML root repo berbeda dari file `src/`: `login.html` root sudah memakai gambar, tetapi `src/login.html` di GitHub masih memakai mark teks “KB”. Karena itu deploy ulang tetap menampilkan teks jika sumber `src/` belum diperbarui.
+87. Salinan lokal `kasir bisa web/src/` telah memakai ikon di seluruh tujuh halaman, tetapi tidak ada push/deploy yang dilakukan dari sesi tersebut; GitHub CLI tidak terautentikasi dan workspace tidak memiliki checkout Git. Pengguna meminta pemeriksaan situs dan repository, lalu diberi penjelasan bahwa berkas dalam `src/` GitHub perlu diperbarui sebelum deploy ulang. Temuan dan batasan ini juga dicatat di `log.md`.
+88. Pengguna melaporkan tata letak halaman Profil pada laptop/layar besar: kolom konfirmasi password saat ini, password baru, dan ulangi password baru harus tersusun rapi berurutan ke bawah. Pengguna juga meminta kotak panduan pemindaian kamera diperbesar tepat 4%.
+89. Perbaikan CSS lokal untuk susunan kolom password pada layar lebar dan kotak scan 4% telah disiapkan; lapisan teks placeholder kamera juga dinaikkan agar tidak tertimpa garis panduan. Build statis berhasil, tetapi perubahan tidak dikirim ke GitHub atau di-deploy karena otorisasi GitHub belum selesai.
+90. Pengguna menjelaskan bahwa perubahan tersebut berasal dari salah unggah dan meminta agar dilupakan. Permintaan dihormati: tidak ada push, deploy, atau perubahan database; salinan sementara repository yang dibuat untuk pemeriksaan dibersihkan, sementara perubahan lokal yang telah ada tidak dihapus.
+91. Pengguna meminta instruksi pada file riwayat ini dijalankan. Instruksinya adalah melanjutkan rangkuman percakapan sebagai daftar bernomor tanpa menimpa catatan terdahulu; entri 88–90 menambahkan rangkuman konteks terbaru.
+92. Pengguna melaporkan panduan kotak pemindaian (`scan-guide`) bertumpuk dengan pesan “Kamera belum aktif”. Pemeriksaan menemukan panduan selalu terlihat ketika kamera mati, serta dua deklarasi `transform` yang saling menimpa sehingga bingkai scan melebar.
+93. `src/scripts/app.js` diperbarui untuk mengaktifkan kelas `camera-active` setelah kamera berhasil menyala dan menghapusnya saat kamera dimatikan. `src/assets/css/style.css` menyembunyikan panduan saat kamera belum aktif dan menghapus transform ganda. Build statis serta pemeriksaan sintaks JavaScript berhasil; tidak ada deploy yang dilakukan.
+94. Pengguna melaporkan tombol search barcode terpotong di HP dan ikon tampak gepeng. CSS khusus layar hingga 700 px di `src/assets/css/style.css` disesuaikan: kolom tombol menjadi 52 px, input boleh menyusut, tombol diberi lebar minimum dan tinggi yang konsisten, serta ikon SVG dikunci pada ukuran 22×22 px; aturan kolom 72 px pada breakpoint 420 px dihapus agar tidak menimpa pengaturan mobile. Build berhasil; tidak ada deploy yang dilakukan.
+95. Pengguna meminta instruksi pada file riwayat ini dijalankan; instruksinya adalah melanjutkan rangkuman percakapan secara berurutan tanpa menimpa informasi yang sudah ada.
+96. Pengguna bertanya tentang jumlah sekitar 12 ribu file; dijelaskan bahwa kemungkinan besar itu folder `node_modules`, yaitu dependensi proyek dan bukan ribuan file kode aplikasi, serta folder tersebut tidak perlu dikirim bersama source.
+97. Pengguna bertanya berapa lama mengekstrak ZIP yang berisi banyak file; diberikan perkiraan kasar 1–5 menit di SSD atau 5–20 menit di hard disk jika memuat `node_modules`, dengan catatan waktu bergantung ukuran ZIP, perangkat, dan pemeriksaan antivirus.
+98. Pengguna menyadari GitHub menolak berkas/folder dependensi dan bertanya apakah proyek dapat diekstrak tanpa `node_modules` serta cara mendapatkannya kembali. Dijelaskan bahwa `npm install` dari folder yang berisi `package.json` akan memasang ulang dependensi, lalu `npm run dev` menjalankan aplikasi; file `.dev.vars` tetap diperlukan untuk konfigurasi lokal dan tidak boleh dibagikan karena berisi secret.
+99. Pengguna meminta agar instruksi dalam file riwayat percakapan ini dijalankan; instruksinya adalah meneruskan rangkuman dalam daftar bernomor tanpa menimpa catatan terdahulu.
+100. Pengguna meminta metode pembayaran untuk usaha UMKM, bukan pembayaran milik admin, serta ingin QRIS. Setelah membahas perbedaan QRIS dinamis dan statis, pengguna memilih QRIS statis karena integrasi gateway terasa terlalu sulit.
+101. Implementasi QRIS sempat salah diarahkan ke salinan `KasirBisa-mobile-update-fixed`. Pengguna mengoreksi bahwa project utama adalah `kasir bisa web`; perubahan di salinan fixed dibersihkan dan fitur kemudian dibuat pada project utama.
+102. Pada project utama ditambahkan pengaturan gambar QRIS per usaha, pilihan Tunai/QRIS saat checkout, konfirmasi manual sebelum transaksi QRIS disimpan, pencatatan metode pembayaran pada riwayat/struk, Pages route adapter, migrasi `0007_payment_methods.sql`, dan pembaruan panduan pengguna.
+103. Sintaks JavaScript, build statis, dan migrasi SQLite dalam database memori berhasil diperiksa. Migrasi `0007` juga berhasil diterapkan ke D1 lokal project utama; tidak ada migrasi remote atau deploy yang dijalankan.
+104. Pengguna bertanya cara menjalankan aplikasi dan kemudian menegaskan agar catatan project dibaca. Catatan `log history percakapan.md` meminta rangkuman dilanjutkan secara bernomor tanpa menimpa entri lama; catatan keamanan melarang membagikan secret dan token.
+105. Pengguna berdiskusi tentang QRIS statis/dinamis, kemungkinan memakai beberapa QR pembayaran dengan label bebas, biaya QRIS, serta cara mendapatkan QR dari DANA. Ditegaskan bahwa QR dompet pribadi tidak otomatis menjadi QRIS; untuk aplikasi, QR bisa ditampilkan sebagai metode pembayaran terpisah dengan konfirmasi manual. Pengguna lalu meminta halaman admin untuk mengelola akun aplikasi, memilih agar halaman online di Cloudflare dan digunakan dari komputer, serta menjelaskan akun Kasir Bisa miliknya tidak memakai Gmail.
+106. Pada project utama `kasir bisa web` dibuat dasbor admin responsif untuk mencari akun, melihat nama usaha, username, tanggal bergabung, jumlah produk/transaksi, dan status, serta mengaktifkan atau menonaktifkan akun. Password dan rincian transaksi tidak ditampilkan; akun tidak dihapus.
+107. Akses admin server-side dibatasi oleh konfigurasi `ADMIN_USERNAME` yang menunjuk ke akun Kasir Bisa yang sudah terdaftar. Akun admin tidak dapat menonaktifkan atau mengganti nama penggunanya dari aplikasi; perubahan status akun lain mengakhiri sesi lama. Ditambahkan Pages adapter, migrasi `0008_admin_accounts.sql`, dan dokumentasi.
+108. Pemeriksaan sintaks, build, migrasi D1 lokal, uji API lokal (akses admin/non-admin, suspend/reactivate, invalidasi sesi, serta perlindungan akun admin), dan tampilan desktop/mobile berhasil. Data uji lokal dibersihkan. D1 remote dan website Cloudflare belum dimigrasikan atau di-deploy; `ADMIN_USERNAME` produksi masih perlu dikonfigurasi.

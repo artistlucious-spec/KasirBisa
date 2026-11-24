@@ -14,6 +14,11 @@ Produk, stok, dan transaksi tersimpan di akun usaha Anda dan terpisah dari usaha
 2. Nama usaha dan nomor WhatsApp ditampilkan sebagai informasi akun. Password tersimpan ditampilkan sebagai titik-titik; tekan ikon mata untuk melihatnya. Ubah nama pengguna atau pilih foto JPG, PNG, atau WebP, lalu simpan perubahan. Foto maksimal 12 MB sebelum diperkecil otomatis. Akun lama perlu masuk kembali sekali setelah pembaruan agar password bisa ditampilkan.
 3. Tekan ikon mata pada baris Password untuk melihat password tersimpan. Untuk menggantinya, pilih **Ganti password**. Nama pengguna akan disembunyikan agar perubahan nama dan password dilakukan terpisah. Isi password saat ini untuk verifikasi, password baru minimal 12 karakter, lalu ulangi password baru.
 4. Pilih **Simpan perubahan**. Jika nama pengguna atau password berubah, Anda perlu masuk kembali di perangkat lain.
+5. Untuk menyiapkan QRIS, unggah gambar QRIS milik usaha, centang **Aktifkan QRIS di halaman kasir**, lalu simpan pengaturan. Gambar maksimal 100 KB.
+
+## Mengelola akun aplikasi
+
+Halaman **Admin** hanya muncul untuk username yang ditetapkan pada konfigurasi server `ADMIN_USERNAME`. Di halaman tersebut, admin dapat mencari akun, melihat nama usaha, tanggal bergabung, jumlah produk/transaksi, lalu menonaktifkan atau mengaktifkan akun. Menonaktifkan akun mengakhiri sesi pengguna; pengguna perlu login kembali setelah diaktifkan. Halaman ini tidak menampilkan password dan tidak menghapus data usaha. Username akun admin dikunci dari perubahan di Profil agar hak admin tidak berpindah ke orang lain.
 
 ## Menyiapkan katalog
 
@@ -27,8 +32,8 @@ Produk, stok, dan transaksi tersimpan di akun usaha Anda dan terpisah dari usaha
 1. Pindai barcode dengan kamera, atau masukkan barcode manual.
 2. Periksa isi keranjang dan kuantitas.
 3. Pilih status member yang benar. Member mendapat diskon 10%; non-member mendapat diskon 5% jika subtotal minimal Rp100.000.
-4. Masukkan uang yang diterima. PPN 11% dihitung setelah diskon.
-5. Tinjau ringkasan dan konfirmasi pembayaran. Stok berkurang setelah transaksi disimpan server.
+4. Pilih **Tunai** atau **QRIS**. Untuk tunai, masukkan jumlah uang yang diterima. Untuk QRIS, tampilkan gambar QR kepada pelanggan dan periksa pembayaran masuk di aplikasi bank atau penyedia QRIS Anda.
+5. Tinjau ringkasan. Untuk QRIS, pilih **Pembayaran diterima & simpan** hanya setelah Anda memastikan pembayaran masuk. Stok berkurang setelah transaksi disimpan server.
 
 ## Rekap dan Smart Insight
 
@@ -40,7 +45,7 @@ Produk, stok, dan transaksi tersimpan di akun usaha Anda dan terpisah dari usaha
 
 - Kamera tidak tersedia: gunakan input barcode manual.
 - Barcode ditolak: cari produk yang sudah memakai barcode tersebut.
-- Pembayaran gagal: periksa jumlah uang dan stok produk.
+- Pembayaran gagal: periksa jumlah uang dan stok produk. Untuk QRIS, pastikan pembayaran masuk sebelum menyimpan transaksi.
 - Tidak dapat menyimpan perubahan profil: pastikan password saat ini benar dan nama pengguna belum digunakan akun lain. Jika masih gagal, hubungi pengelola Kasir Bisa.
 - Jika diminta masuk kembali, gunakan nama pengguna atau nomor WhatsApp beserta password.
 

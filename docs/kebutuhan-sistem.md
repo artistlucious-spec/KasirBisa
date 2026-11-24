@@ -4,6 +4,7 @@
 
 - Setiap pemilik usaha dapat membuat akun sendiri menggunakan nama usaha, nama pengguna, nomor WhatsApp, dan password.
 - Data setiap usaha harus terisolasi; pengguna hanya dapat membaca atau mengubah data usahanya sendiri.
+- Username yang dipilih melalui konfigurasi server `ADMIN_USERNAME` dapat melihat ringkasan akun dan mengubah status aktifnya; akses ini tidak boleh ditentukan oleh browser.
 - Akun lama dipertahankan sebagai satu usaha terpisah setelah migrasi. Secret `KASIR_USERNAME` dan `KASIR_PASSWORD` tetap dapat dipakai untuk membuat akun lama jika belum tersimpan di D1.
 
 ## Perangkat dan browser
@@ -18,6 +19,7 @@
 - Cloudflare Pages untuk hosting halaman statis dan Pages Functions.
 - Cloudflare D1 terikat pada binding `DB`.
 - Secret `AUTH_SESSION_SECRET` dengan panjang minimal 32 karakter.
+- Variable `ADMIN_USERNAME` opsional untuk mengaktifkan akses admin bagi satu akun Kasir Bisa.
 - Secret `KASIR_USERNAME` dan `KASIR_PASSWORD` (minimal 12 karakter) opsional, hanya untuk bootstrap akun lama saat diperlukan.
 - `GEMINI_API_KEY` hanya diperlukan untuk membuat insight dengan Gemini; ringkasan dasar dihitung dari data D1.
 

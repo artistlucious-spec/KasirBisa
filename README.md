@@ -22,16 +22,17 @@ Build statis dapat diperiksa dengan `npm run build`. Untuk pemeriksaan sintaks J
 
 Project Pages dan database D1 yang dipakai aplikasi bernama `kasirbisa`. Pastikan Wrangler menggunakan akun Cloudflare yang sama dengan project Pages sebelum menjalankan perintah remote.
 
-Atur secrets di environment Cloudflare Pages yang digunakan:
+Atur variables/secrets di environment Cloudflare Pages yang digunakan:
 
 - `AUTH_SESSION_SECRET`: secret acak minimal 32 karakter.
 - `AUTH_SESSION_SECRET` juga digunakan untuk mengenkripsi salinan password yang bisa ditampilkan di profil. Jaga secret ini sangat ketat; siapa pun yang memiliki secret dan akses ke D1 dapat membaca password pengguna.
 - `KASIR_USERNAME`: opsional, username akun lama jika perlu dibuat ulang.
 - `KASIR_PASSWORD`: opsional, password akun lama minimal 12 karakter jika perlu dibuat ulang.
+- `ADMIN_USERNAME`: username Kasir Bisa yang diberi akses halaman admin. Atur hanya setelah akun tersebut sudah terdaftar; jika tidak diatur, akses admin tidak aktif. Set nilainya di environment Pages dan `.dev.vars` lokal. Username akun admin tidak dapat diubah dari halaman profil agar hak admin tidak berpindah ke akun lain.
 - `GEMINI_API_KEY`: opsional, untuk membuat analisis dengan Gemini.
 - `GEMINI_MODEL`: opsional; model default tersedia di `.dev.vars.example`.
 
-Pengguna baru dapat mendaftar melalui halaman **Daftar usaha**. Data setiap usaha dipisahkan di D1. Jalankan `npm run d1:migrate:remote` untuk menerapkan migrasi ke D1 remote yang dikonfigurasi; migrasi `0004_multi_tenant_accounts.sql` mempertahankan data lama di usaha legacy. Pengguna lama harus login kembali setelah migrasi `0005_password_encrypted.sql` agar salinan password terenkripsi tersimpan untuk ditampilkan di profil. Password lama yang sudah tersimpan sebagai hash tidak bisa dipulihkan sebelum login kembali.
+Pengguna baru dapat mendaftar melalui halaman **Daftar usaha**. Data setiap usaha dipisahkan di D1. Halaman admin dibatasi di backend ke username yang dikonfigurasi pada `ADMIN_USERNAME`; admin dapat melihat ringkasan akun dan mengaktifkan atau menonaktifkannya, tetapi tidak dapat membaca password atau menghapus akun. Jalankan `npm run d1:migrate:remote` untuk menerapkan migrasi ke D1 remote yang dikonfigurasi hanya setelah memeriksa target database; migrasi `0004_multi_tenant_accounts.sql` mempertahankan data lama di usaha legacy. Pengguna lama harus login kembali setelah migrasi `0005_password_encrypted.sql` agar salinan password terenkripsi tersimpan untuk ditampilkan di profil. Password lama yang sudah tersimpan sebagai hash tidak bisa dipulihkan sebelum login kembali.
 
 Deploy website Pages dengan `npm run deploy`. Secrets tidak dimasukkan ke source code atau dibagikan.
 

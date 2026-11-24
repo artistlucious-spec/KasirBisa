@@ -10,6 +10,11 @@
 
 Perubahan penting pada website dicatat di sini.
 
+## Dasbor admin akun
+- Menambahkan halaman Admin dengan pencarian akun, ringkasan jumlah produk/transaksi, dan kontrol aktif/nonaktif akun.
+- Membatasi endpoint admin di backend berdasarkan `ADMIN_USERNAME`; akun nonaktif ditolak saat login maupun saat memakai sesi lama.
+- Menambahkan migrasi `0008_admin_accounts.sql`; tidak menerapkan migrasi ke D1 remote atau melakukan deploy.
+
 ## Belum dirilis
 
 - Menambahkan pendaftaran akun usaha dan memisahkan produk, transaksi, stok, serta insight per usaha.

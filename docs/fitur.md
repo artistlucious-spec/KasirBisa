@@ -22,6 +22,7 @@
 
 - Pengguna dapat mendaftar akun usaha dengan nama usaha, nama pengguna, nomor WhatsApp, dan password.
 - Data produk, transaksi, stok, laporan, serta profil dipisahkan untuk setiap usaha.
+- Pengelola yang ditentukan melalui `ADMIN_USERNAME` dapat melihat ringkasan akun dan mengaktifkan atau menonaktifkannya melalui halaman Admin.
 - Sesi menggunakan cookie `HttpOnly` dengan masa aktif 12 jam.
 - Menu hamburger mengakses Kasir, Rekap, Smart Insight, Panduan, Profil, dan Keluar.
 - Halaman Profil menampilkan nama usaha dan WhatsApp, serta dapat mengganti username, password dengan verifikasi password saat ini, dan foto profil.

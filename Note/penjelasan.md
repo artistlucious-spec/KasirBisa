@@ -74,12 +74,13 @@ Untuk permintaan perubahan, telusuri dari halaman yang terlihat sampai ke penyim
 | `GET` / `PUT /api/auth/profile` | `functions/api/auth/profile.js` | Membaca dan memperbarui profil. |
 | `GET` / `POST /api/products` | `functions/api/products.js` | Membaca katalog atau menambahkan produk. |
 | `PUT` / `DELETE /api/products/{code}` | `functions/api/products/[code].js` | Mengubah atau menghapus satu produk. |
+| `GET` / `PUT /api/payment-settings` | `functions/api/payment-settings.js` | Membaca dan menyimpan pengaturan QRIS per usaha. |
 | `GET` / `POST /api/transactions` | `functions/api/transactions.js` | Membaca riwayat atau menyimpan checkout. |
 | `POST /api/smart-insight` | `functions/api/smart-insight.js` | Menghitung fakta penjualan dan meminta analisis opsional. |
 
 ### Aturan penting yang perlu dipertahankan
 
-- Setiap produk dan transaksi terikat ke `business_id` dari sesi; jangan mengambil ruang usaha dari data yang dikirim browser.
+- Setiap produk, transaksi, dan pengaturan pembayaran terikat ke `business_id` dari sesi; jangan mengambil ruang usaha dari data yang dikirim browser.
 - Browser boleh menghitung subtotal untuk tampilan, tetapi backend harus memverifikasi harga, stok, pembayaran, dan total sebelum menyimpan transaksi.
 - Transaksi, item, dan pengurangan stok disimpan bersama melalui batch database.
 - Hash password dipakai untuk verifikasi. Cookie sesi bertanda tangan dan berlaku 12 jam.
@@ -110,6 +111,7 @@ kasir bisa web/
 │   ├── panduan-pengguna.md
 ├── functions/api/
 │   ├── products.js
+│   ├── payment-settings.js
 │   ├── smart-insight.js
 │   ├── transactions.js
 │   ├── auth/
@@ -124,7 +126,9 @@ kasir bisa web/
 │   ├── 0002_seed_products.sql
 │   ├── 0003_owner_profile.sql
 │   ├── 0004_multi_tenant_accounts.sql
-│   └── 0005_password_encrypted.sql
+│   ├── 0005_password_encrypted.sql
+│   ├── 0006_store_alerts.sql
+│   └── 0007_payment_methods.sql
 ├── Note/
 │   ├── aktivitas.md
 │   ├── bindings.png
@@ -198,7 +202,7 @@ kasir bisa web/
 | `wrangler.toml` | Nama project Pages, folder website (`src`), tanggal kompatibilitas runtime, dan binding database D1 `DB`. |
 | `README.md` | Ringkasan teknologi, konfigurasi, dan petunjuk menjalankan proyek. |
 | `PANDUAN-ARSITEKTUR.md` | Penjelasan arsitektur, alur data, fitur, dan gambaran fungsi beberapa file. |
-| `worker.js` | Handler server utama: autentikasi, sesi, produk, transaksi, Smart Insight, dan akses D1. |
+| `worker.js` | Handler server utama: autentikasi, sesi, produk, pengaturan pembayaran, transaksi, Smart Insight, dan akses D1. |
 | `docs/arsitektur.md` | Ringkasan komponen sistem, autentikasi, dan alur transaksi. |
 | `docs/database.md` | Penjelasan tabel database, urutan migrasi, dan formula transaksi. |
 | `docs/fitur.md` | Daftar kemampuan yang disediakan aplikasi. |
@@ -218,6 +222,7 @@ kasir bisa web/
 | `functions/api/auth/signup.js` | Adapter pendaftaran usaha. |
 | `functions/api/products.js` | Adapter daftar dan tambah produk. |
 | `functions/api/products/[code].js` | Adapter produk dengan kode dinamis untuk ubah/hapus. |
+| `functions/api/payment-settings.js` | Adapter baca/simpan pengaturan QRIS per usaha. |
 | `functions/api/transactions.js` | Adapter baca riwayat dan buat transaksi. |
 | `functions/api/smart-insight.js` | Adapter permintaan insight. |
 | `migrations/0001_initial.sql` | Membuat tabel awal produk, transaksi, item transaksi, dan indeks. |
@@ -225,6 +230,8 @@ kasir bisa web/
 | `migrations/0003_owner_profile.sql` | Skema profil pemilik versi awal sebelum sistem multi-usaha. |
 | `migrations/0004_multi_tenant_accounts.sql` | Membuat tabel usaha/pengguna dan memindahkan data lama agar terhubung ke usaha legacy. |
 | `migrations/0005_password_encrypted.sql` | Menambah kolom password terenkripsi untuk fitur tampilan password profil. |
+| `migrations/0006_store_alerts.sql` | Menambahkan penyimpanan Pusat Perhatian Toko per usaha. |
+| `migrations/0007_payment_methods.sql` | Mencatat metode pembayaran transaksi dan menyimpan gambar/status QRIS per usaha. |
 
 Route API sebagian besar hanya meneruskan `request`, `env`, dan konteks Pages ke `worker.js`. Perubahan perilaku endpoint biasanya harus dilakukan pada `worker.js`, bukan dengan menyalin aturan ke file adapter.
 
@@ -232,26 +239,26 @@ Route API sebagian besar hanya meneruskan `request`, `env`, dan konteks Pages ke
 
 | File | Fungsi halaman |
 |---|---|
-| `src/index.html` | Halaman kasir: kamera/barcode, katalog, keranjang, pembayaran, ringkasan, dan dialog struk. |
+| `src/index.html` | Halaman kasir: kamera/barcode, katalog, keranjang, tunai/QRIS, ringkasan, dan dialog struk. |
 | `src/login.html` | Form login untuk akun yang sudah terdaftar. |
 | `src/signup.html` | Form pendaftaran nama usaha, pengguna, WhatsApp, dan password. |
 | `src/rekap.html` | Tabel transaksi, pencarian, filter produk, dan tombol CSV. |
 | `src/smart-insight.html` | Tampilan ringkasan, kartu insight, fakta transaksi, dan status konfigurasi Gemini. |
-| `src/profile.html` | Tampilan serta form username, foto profil, dan penggantian password. |
+| `src/profile.html` | Tampilan serta form username, foto profil, penggantian password, dan pengaturan QRIS toko. |
 | `src/panduan.html` | Petunjuk penggunaan yang dapat dibuka pengguna dari menu aplikasi. |
 
 ### JavaScript browser
 
 | File | Tanggung jawab |
 |---|---|
-| `src/scripts/app.js` | Menghubungkan elemen kasir ke API: memuat data, katalog, scanner, keranjang, dialog, dan checkout. |
+| `src/scripts/app.js` | Menghubungkan kasir ke API: memuat data, katalog, scanner, keranjang, metode pembayaran, dialog, dan checkout. |
 | `src/scripts/kasir.js` | Logika domain sisi browser untuk katalog, keranjang, subtotal/diskon/PPN, dan ringkasan. Backend tetap menghitung ulang checkout. |
 | `src/scripts/auth-guard.js` | Menyembunyikan halaman privat sambil memeriksa sesi dan mengikat tombol keluar. |
 | `src/scripts/image-utils.js` | Memeriksa tipe/ukuran foto dan mengompresnya ke WebP. |
 | `src/scripts/login.js` | Mengirim login dan memeriksa apakah sesi sebelumnya masih aktif. |
 | `src/scripts/signup.js` | Mengirim formulir pendaftaran dan memeriksa kecocokan konfirmasi password. |
 | `src/scripts/navigation.js` | Mengatur buka/tutup menu, klik di luar menu, dan tombol Escape. |
-| `src/scripts/profile.js` | Memuat dan menyimpan profil, foto, serta password. |
+| `src/scripts/profile.js` | Memuat dan menyimpan profil, foto, password, serta QRIS statis usaha. |
 | `src/scripts/rekap.js` | Menyaring transaksi, menampilkan tabel, dan membuat unduhan CSV. |
 | `src/scripts/smart-insight.js` | Meminta insight API, mengisi tampilan, dan menangani pesan/status hasil. |
 

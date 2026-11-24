@@ -132,18 +132,36 @@
 
           <section class="payment-card" aria-labelledby="payment-title">
             <p class="eyebrow">PEMBAYARAN</p>
-            <h2 id="payment-title">Uang diterima</h2>
+            <h2 id="payment-title">Pilih pembayaran</h2>
             <label class="member-option">
               <input id="member" type="checkbox">
               <span>Pelanggan member <small>Diskon 10%</small></span>
             </label>
-            <form id="form-pembayaran" novalidate>
-              <label class="amount-field" for="bayar">
-                <span class="currency-prefix">Rp</span>
-                <input id="bayar" type="number" min="0" step="1" inputmode="numeric" placeholder="0" required>
+            <fieldset class="payment-method-options">
+              <legend>Metode pembayaran</legend>
+              <label class="payment-method-option">
+                <input id="metode-tunai" type="radio" name="metode-pembayaran" value="tunai" checked>
+                <span>Tunai</span>
               </label>
-              <div id="nominal-cepat" class="quick-amounts" aria-label="Pilihan nominal pembayaran"></div>
-              <div class="change-row"><span>Kembalian</span><strong id="kembalian">Rp0</strong></div>
+              <label class="payment-method-option">
+                <input id="metode-qris" type="radio" name="metode-pembayaran" value="qris" disabled>
+                <span>QRIS <small id="status-pilihan-qris">Atur QRIS toko terlebih dahulu</small></span>
+              </label>
+            </fieldset>
+            <a id="link-atur-qris" class="qris-settings-link" href="profile.html">Atur QRIS toko</a>
+            <div id="panduan-qris-kasir" class="qris-checkout-guide" hidden>
+              <img id="gambar-qris-kasir" alt="QRIS toko untuk dipindai pelanggan">
+              <p>Tampilkan QR ini ke pelanggan. Pastikan pembayaran sudah masuk di aplikasi Anda sebelum menekan konfirmasi.</p>
+            </div>
+            <form id="form-pembayaran" novalidate>
+              <div id="baris-uang-diterima">
+                <label class="amount-field" for="bayar">
+                  <span class="currency-prefix">Rp</span>
+                  <input id="bayar" type="number" min="0" step="1" inputmode="numeric" placeholder="0" required>
+                </label>
+                <div id="nominal-cepat" class="quick-amounts" aria-label="Pilihan nominal pembayaran"></div>
+              </div>
+              <div id="baris-kembalian" class="change-row"><span>Kembalian</span><strong id="kembalian">Rp0</strong></div>
               <button id="tombol-bayar" class="primary-button" type="submit" disabled>Bayar</button>
             </form>
           </section>
@@ -166,6 +184,10 @@
       <p class="eyebrow">PERIKSA PESANAN</p>
       <h2 id="judul-dialog">Konfirmasi pembayaran</h2>
       <div id="ringkasan-konfirmasi" class="dialog-summary"></div>
+      <div id="konfirmasi-qris" class="qris-confirmation" hidden>
+        <img id="gambar-qris-dialog" alt="QRIS toko untuk dipindai pelanggan">
+        <p>Silakan cek aplikasi bank atau penyedia QRIS. Lanjutkan hanya setelah pembayaran sebesar total belanja benar-benar diterima.</p>
+      </div>
       <div class="dialog-actions">
         <button id="batal-konfirmasi" class="secondary-button" type="button">Kembali</button>
         <button id="konfirmasi-pembayaran" class="primary-button" type="button">Konfirmasi &amp; bayar</button>

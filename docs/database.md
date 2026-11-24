@@ -10,6 +10,8 @@ Kasir Bisa Web menggunakan Cloudflare D1 melalui binding `DB`. Konfigurasi datab
 - `0004_multi_tenant_accounts.sql`: akun dan usaha, pemisahan data per usaha, serta pemindahan akun/data lama.
 - `0005_password_encrypted.sql`: menambahkan kolom password terenkripsi untuk tampilan password pada profil.
 - `0006_store_alerts.sql`: menambahkan penyimpanan Pusat Perhatian Toko dengan status, prioritas, bukti analisis, dan pencegahan duplikasi notifikasi aktif per usaha.
+- `0007_payment_methods.sql`: mencatat metode pembayaran pada transaksi dan menyimpan gambar serta status QRIS per usaha.
+- `0008_admin_accounts.sql`: menambahkan status aktif/nonaktif akun untuk pengelolaan akses admin.
 
 Jalankan `npm run d1:migrate:local` untuk D1 lokal. Setelah menerapkan `0005_password_encrypted.sql`, pengguna lama harus login kembali agar aplikasi dapat membuat salinan password terenkripsi dari password yang baru diverifikasi. Jalankan `npm run d1:migrate:remote` hanya setelah memastikan akun Cloudflare dan database remote yang dikonfigurasi adalah milik project Pages `kasirbisa`. Jangan menjalankan migrasi remote tanpa memeriksa target database.
 
@@ -21,7 +23,7 @@ Menyimpan identitas dan nama usaha. Akun baru mendapat usaha tersendiri; usaha l
 
 ### `users`
 
-Menyimpan `business_id`, username unik, nomor WhatsApp, hash dan salt password, foto profil, versi sesi, serta waktu pembaruan. Password plaintext tidak disimpan. WhatsApp dinormalisasi menjadi digit dan unik jika terisi.
+Menyimpan `business_id`, username unik, nomor WhatsApp, hash dan salt password, foto profil, versi sesi, status aktif, serta waktu pembaruan. Password plaintext tidak disimpan. WhatsApp dinormalisasi menjadi digit dan unik jika terisi. Akun nonaktif tidak dapat login atau menggunakan sesi; setiap perubahan status menaikkan `session_version`.
 
 ### `products`
 
@@ -29,7 +31,11 @@ Menyimpan `business_id`, kode, barcode, nama, kategori, harga, stok, dan gambar.
 
 ### `transactions`
 
-Menyimpan ID transaksi, `business_id`, waktu, subtotal, diskon, PPN, total, uang dibayar, kembalian, dan status member.
+Menyimpan ID transaksi, `business_id`, waktu, subtotal, diskon, PPN, total, uang dibayar, kembalian, status member, dan metode pembayaran (`tunai` atau `qris`). Riwayat sebelum migrasi `0007` dianggap sebagai transaksi tunai.
+
+### `business_payment_settings`
+
+Menyimpan status QRIS dan gambar QRIS statis yang dimiliki masing-masing usaha. Setiap pengaturan terikat ke `business_id` dari sesi login; gambar hanya ditampilkan kepada pengguna usaha tersebut. QRIS statis memerlukan pemeriksaan pembayaran manual oleh kasir sebelum transaksi disimpan.
 
 ### `transaction_items`
 

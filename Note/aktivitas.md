@@ -76,3 +76,10 @@ Buka [halaman signup produksi](https://kasirbisa.pages.dev/signup) dan daftar de
 - Daftar proyek Pages melalui Wrangler gagal karena token berizin minimum tidak memiliki cakupan Pages; saya tidak meminta izin tambahan. Domain produksi yang teridentifikasi dari proyek `kasirbisa`, `https://kasirbisa.pages.dev/signup`, merespons HTTP 200. Tes akan memakai domain ini, bukan URL preview yang sedang terbuka di browser pengguna.
 - Pengguna menyetujui satu akun uji sementara dan penghapusan akun/bisnis kosongnya. POST ke `https://kasirbisa.pages.dev/api/auth/signup` berhasil dengan HTTP 201 dan `success: true`. Akun uji `kasirbisa_test_20261119_120032` serta bisnis kosong yang dibuat tes sudah dihapus secara terarah. Verifikasi akhir: akun/bisnis uji tersisa 0; data produksi tetap 1 bisnis, 1 user legacy, 15 produk, 4 transaksi, 6 item transaksi, dan 0 item yatim. Wrangler mengonfirmasi tidak ada migrasi yang tertunda.
 - Konfigurasi migrasi sementara dan empat file penangkap output OAuth di direktori Temp telah dibersihkan. `wrangler.toml`, `package.json`, dan proses deploy GitHub tidak diubah.
+
+## 2026-11-24
+
+- Implementasi QRIS statis per usaha pada project utama `kasir bisa web`: pemilik dapat mengunggah dan mengaktifkan gambar QRIS sendiri; kasir wajib memeriksa pembayaran secara manual sebelum menyimpan transaksi.
+- Transaksi sekarang mencatat metode pembayaran (`tunai` atau `qris`); dokumentasi database dan panduan pengguna diperbarui.
+- Migrasi `0007_payment_methods.sql` berhasil diterapkan pada D1 lokal. Pemeriksaan konfigurasi saat ini menunjukkan `wrangler.toml` project utama mengarah ke database `kasirbisa`; tidak ada migrasi remote, perubahan database produksi, atau deploy pada pekerjaan ini.
+- Pemeriksaan sintaks JavaScript, build statis, dan uji migrasi skema dalam SQLite memori berhasil. Migrasi D1 lokal sempat gagal pada percobaan di salinan `fixed`; percobaan pada project utama berhasil.

@@ -23,6 +23,7 @@ Browser
 - `functions/api/`: route adapter Pages; setiap adapter meneruskan request ke handler `worker.js`.
 - `worker.js`: memvalidasi autentikasi, mengolah request API, dan mengakses D1. Smart Insight dapat meminta analisis Gemini.
 - `migrations/`: skema dan data awal D1.
+- `src/admin.html` dan `src/scripts/admin.js`: dasbor admin untuk melihat ringkasan akun serta mengubah status aktif.
 
 ## Autentikasi dan profil
 
@@ -35,6 +36,11 @@ Browser
 6. Sesi ditandatangani dengan `AUTH_SESSION_SECRET`, menyertakan ID akun dan versi sesi, disimpan dalam cookie `HttpOnly`, dan berlaku 12 jam.
 7. Mengubah username atau password menaikkan versi sesi. Sesi pada perangkat lain menjadi tidak berlaku dan sesi aktif menerima cookie baru.
 8. Foto profil dikompres menjadi WebP di browser dan disimpan pada `users.profile_image`.
+9. Akses admin hanya diberikan kepada username yang cocok dengan `ADMIN_USERNAME` pada konfigurasi server. `/api/admin/accounts` memeriksa sesi dan hak tersebut pada setiap request; menonaktifkan akun menaikkan versi sesi agar sesi lama tidak bisa dipakai kembali.
+
+## Dasbor admin
+
+Admin dapat melihat nama usaha, username, tanggal bergabung, jumlah produk, jumlah transaksi, dan status akun. Admin dapat mengaktifkan atau menonaktifkan akun, tetapi tidak dapat membaca password maupun menghapus akun. Endpoint admin tidak mempercayai status dari browser; otorisasi dilakukan ulang pada backend.
 
 ## Alur transaksi
 

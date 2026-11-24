@@ -5,6 +5,7 @@ let transaksiMenunggu = null;
 let pesanKesalahanPenyimpanan = "";
 let gambarProdukPerubahan = null;
 let gambarProdukDiproses = false;
+let pengaturanPembayaran = { qrisEnabled: false, qrisImage: "" };
 
 const elProduk = document.getElementById("daftar-produk");
 const elPencarian = document.getElementById("cari-produk");
@@ -188,12 +189,31 @@ function renderNominalCepat(total) {
 
 function renderPembayaran() {
   const total = KasirLogic.hitungRingkasan(keranjang, elMember.checked).total;
-  const dibayar = elBayar.value.trim() === "" ? NaN : Number(elBayar.value);
-  const valid = Number.isSafeInteger(dibayar) && dibayar >= total;
+  const pilihanQris = document.getElementById("metode-qris");
+  const qrisReady = pengaturanPembayaran.qrisEnabled && Boolean(pengaturanPembayaran.qrisImage);
+  pilihanQris.disabled = !qrisReady;
+  document.getElementById("status-pilihan-qris").textContent =
+    qrisReady ? "Periksa pembayaran secara manual" : "Atur QRIS toko terlebih dahulu";
+  document.getElementById("link-atur-qris").hidden = qrisReady;
+  if (pilihanQris.disabled && pilihanQris.checked) document.getElementById("metode-tunai").checked = true;
+  const isQris = pilihanQris.checked;
+  const dibayar = isQris ? total : elBayar.value.trim() === "" ? NaN : Number(elBayar.value);
+  const valid = isQris
+    ? qrisReady
+    : Number.isSafeInteger(dibayar) && dibayar >= total;
+  elBayar.required = !isQris;
+  elBayar.disabled = isQris;
+  document.getElementById("baris-uang-diterima").hidden = isQris;
+  document.getElementById("baris-kembalian").hidden = isQris;
+  document.getElementById("panduan-qris-kasir").hidden = !isQris;
+  if (pengaturanPembayaran.qrisImage) {
+    document.getElementById("gambar-qris-kasir").src = pengaturanPembayaran.qrisImage;
+  }
   document.getElementById("kembalian").textContent =
-    valid ? rupiah(dibayar - total) : rupiah(0);
+    valid && !isQris ? rupiah(dibayar - total) : rupiah(0);
   document.getElementById("tombol-bayar").disabled =
-    Boolean(pesanKesalahanPenyimpanan) || keranjang.length === 0;
+    Boolean(pesanKesalahanPenyimpanan) || keranjang.length === 0 || !valid;
+  document.getElementById("tombol-bayar").textContent = isQris ? "Tampilkan QRIS" : "Bayar";
   renderNominalCepat(total);
 }
 
@@ -233,7 +253,8 @@ function isiRincian(target, transaksi) {
   addTotal("Total", transaksi.total, true);
   const payment = elemen("div", "receipt-totals receipt-payment");
   const payLine = (label, value) => { const line = elemen("div", "receipt-total"); line.append(elemen("span", "", label), elemen("strong", "", rupiah(value))); payment.append(line); };
-  payLine("Tunai", transaksi.dibayar); payLine("Kembalian", transaksi.kembalian);
+  payLine(transaksi.metodePembayaran === "qris" ? "QRIS" : "Tunai", transaksi.dibayar);
+  if (transaksi.metodePembayaran !== "qris") payLine("Kembalian", transaksi.kembalian);
   const footer = elemen("div", "receipt-footer"); footer.append(elemen("strong", "", "Terima kasih atas kunjungan Anda!"), elemen("small", "", "Semoga hari Anda menyenangkan."));
   card.append(header, divider(), meta, divider(), elemen("h3", "receipt-items-title", "Rincian belanja"), items, divider(), totals, payment, divider(), footer);
   target.append(card);
@@ -272,7 +293,9 @@ function buatCanvasStruk(transaksi) {
   const total = (label, value, bold = false) => { addText(label, padding, y, `${bold ? "bold " : ""}20px Arial`, bold ? "#14243a" : "#667085"); addText(formatReceiptAmount(value), width-padding, y, `${bold ? "bold " : ""}${bold ? 27 : 20}px Arial`, bold ? "#1769c2" : "#182433", "right"); y += bold ? 42 : 32; };
   total("Subtotal", transaksi.subtotal); if (Number(transaksi.diskon || 0)) total("Diskon", -Number(transaksi.diskon));
   if (Number(transaksi.ppn || 0)) total("PPN", transaksi.ppn); total("TOTAL", transaksi.total, true);
-  y += 8; total("Tunai", transaksi.dibayar); total("Kembalian", transaksi.kembalian); y += 14; addRule();
+  y += 8; total(transaksi.metodePembayaran === "qris" ? "QRIS" : "Tunai", transaksi.dibayar);
+  if (transaksi.metodePembayaran !== "qris") total("Kembalian", transaksi.kembalian);
+  y += 14; addRule();
   addText("Terima kasih atas kunjungan Anda!", width/2, y, "bold 21px Arial", "#14243a", "center"); y += 30;
   addText("Semoga hari Anda menyenangkan.", width/2, y, "18px Arial", "#667085", "center");
   canvas.height = y + padding;
@@ -324,6 +347,16 @@ async function requestApi(url, options = {}) {
   if (response.status === 401) window.location.replace("/login.html");
   if (!response.ok) throw new Error(data.error || "Permintaan ke database gagal");
   return data;
+}
+
+async function muatPengaturanPembayaran() {
+  try {
+    pengaturanPembayaran = await requestApi("/api/payment-settings");
+    renderPembayaran();
+  } catch (error) {
+    tampilkanPesan(`Pengaturan QRIS tidak dapat dimuat: ${error.message}`, "error");
+    renderPembayaran();
+  }
 }
 
 async function muatProduk() {
@@ -464,12 +497,25 @@ function prosesBarcode(barcode) {
 
 function ajukanPembayaran() {
   try {
+    const metodePembayaran = document.querySelector('input[name="metode-pembayaran"]:checked').value;
+    const total = KasirLogic.hitungRingkasan(keranjang, elMember.checked).total;
+    if (metodePembayaran === "qris" && (!pengaturanPembayaran.qrisEnabled || !pengaturanPembayaran.qrisImage)) {
+      throw new Error("QRIS toko belum siap. Atur QRIS terlebih dahulu.");
+    }
     transaksiMenunggu = KasirLogic.buatTransaksi(
       keranjang,
-      Number(elBayar.value),
+      metodePembayaran === "qris" ? total : Number(elBayar.value),
       elMember.checked
     );
+    transaksiMenunggu.metodePembayaran = metodePembayaran;
     isiRincian(document.getElementById("ringkasan-konfirmasi"), transaksiMenunggu);
+    const konfirmasiQris = document.getElementById("konfirmasi-qris");
+    konfirmasiQris.hidden = metodePembayaran !== "qris";
+    if (metodePembayaran === "qris") {
+      document.getElementById("gambar-qris-dialog").src = pengaturanPembayaran.qrisImage;
+    }
+    document.getElementById("konfirmasi-pembayaran").textContent =
+      metodePembayaran === "qris" ? "Pembayaran diterima & simpan" : "Konfirmasi & bayar";
     document.getElementById("langkah-konfirmasi").hidden = false;
     document.getElementById("langkah-struk").hidden = true;
     elDialog.showModal();
@@ -491,6 +537,8 @@ async function konfirmasiPembayaran() {
         items: transaksiMenunggu.items,
         dibayar: transaksiMenunggu.dibayar,
         member: transaksiMenunggu.member,
+        paymentMethod: transaksiMenunggu.metodePembayaran,
+        qrisConfirmed: transaksiMenunggu.metodePembayaran === "qris",
       }),
     });
     const transaksiBaru = hasil.transaksi;
@@ -500,6 +548,7 @@ async function konfirmasiPembayaran() {
     keranjang = [];
     elBayar.value = "";
     elMember.checked = false;
+    document.getElementById("metode-tunai").checked = true;
     document.getElementById("langkah-konfirmasi").hidden = true;
     document.getElementById("langkah-struk").hidden = false;
     await muatProduk();
@@ -568,6 +617,9 @@ elKategori.addEventListener("change", renderProduk);
 elMember.addEventListener("change", () => {
   renderKeranjang();
   renderPembayaran();
+});
+document.querySelectorAll('input[name="metode-pembayaran"]').forEach((input) => {
+  input.addEventListener("change", renderPembayaran);
 });
 elBayar.addEventListener("input", renderPembayaran);
 document.getElementById("nominal-cepat").addEventListener("click", (event) => {
@@ -721,4 +773,5 @@ document.getElementById("form-barcode").addEventListener("submit", (event) => {
   document.getElementById("input-barcode").value = "";
 });
 
+muatPengaturanPembayaran();
 muatProduk();

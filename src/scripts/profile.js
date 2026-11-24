@@ -28,6 +28,18 @@ let changedProfileImage = null;
 let profileImageProcessing = false;
 let profileLoaded = false;
 let profileSupportsPasswordDisplay = false;
+const qrisForm = document.getElementById("form-qris");
+const qrisImageInput = document.getElementById("qris-gambar");
+const qrisImagePreview = document.getElementById("qris-pratinjau");
+const qrisEmptyPreview = document.getElementById("qris-pratinjau-kosong");
+const qrisEnabledInput = document.getElementById("aktifkan-qris");
+const qrisRemoveButton = document.getElementById("hapus-qris");
+const qrisSaveButton = document.getElementById("simpan-qris");
+const qrisStatus = document.getElementById("status-qris");
+let savedQrisImage = "";
+let changedQrisImage = null;
+let qrisSettingsLoaded = false;
+let qrisImageProcessing = false;
 
 function setCurrentPasswordVisible(isVisible) {
   currentPasswordInput.type = isVisible ? "text" : "password";
@@ -111,6 +123,140 @@ function renderProfileImage(image, username) {
   if (image) profileImagePreview.src = image;
   else profileImagePreview.removeAttribute("src");
 }
+
+function setQrisStatus(text, isError = false) {
+  qrisStatus.textContent = text;
+  qrisStatus.className = `profile-status${isError ? " error" : ""}`;
+}
+
+function renderQrisImage(image) {
+  qrisImagePreview.hidden = !image;
+  qrisEmptyPreview.hidden = Boolean(image);
+  qrisRemoveButton.hidden = !image;
+  if (image) qrisImagePreview.src = image;
+  else qrisImagePreview.removeAttribute("src");
+}
+
+function readQrisFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Gambar QRIS tidak dapat dibaca."));
+    }, { once: true });
+    reader.addEventListener("error", () => reject(new Error("Gambar QRIS tidak dapat dibaca.")), { once: true });
+    reader.readAsDataURL(file);
+  });
+}
+
+async function loadQrisSettings() {
+  try {
+    const response = await fetch("/api/payment-settings", {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      window.location.replace("/login.html");
+      return;
+    }
+    if (!response.ok) throw new Error(data.error || "Pengaturan QRIS tidak dapat dimuat.");
+
+    savedQrisImage = data.qrisImage || "";
+    qrisEnabledInput.checked = Boolean(data.qrisEnabled);
+    renderQrisImage(savedQrisImage);
+    qrisSettingsLoaded = true;
+    qrisSaveButton.disabled = false;
+  } catch (error) {
+    setQrisStatus(error.message, true);
+  }
+}
+
+qrisImageInput.addEventListener("change", async () => {
+  const file = qrisImageInput.files?.[0];
+  if (!file) return;
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    qrisImageInput.value = "";
+    setQrisStatus("Pilih gambar QRIS berformat JPG, PNG, atau WebP.", true);
+    return;
+  }
+  if (file.size > 100 * 1024) {
+    qrisImageInput.value = "";
+    setQrisStatus("Ukuran gambar QRIS maksimal 100 KB.", true);
+    return;
+  }
+
+  qrisSaveButton.disabled = true;
+  qrisRemoveButton.disabled = true;
+  qrisImageProcessing = true;
+  setQrisStatus("Membaca gambar QRIS...");
+  try {
+    changedQrisImage = await readQrisFile(file);
+    renderQrisImage(changedQrisImage);
+    setQrisStatus("Gambar QRIS siap disimpan.");
+  } catch (error) {
+    qrisImageInput.value = "";
+    setQrisStatus(error.message, true);
+  } finally {
+    qrisImageProcessing = false;
+    qrisRemoveButton.disabled = false;
+    qrisSaveButton.disabled = !qrisSettingsLoaded;
+  }
+});
+
+qrisRemoveButton.addEventListener("click", () => {
+  changedQrisImage = "";
+  qrisEnabledInput.checked = false;
+  qrisImageInput.value = "";
+  renderQrisImage("");
+  setQrisStatus("Gambar akan dihapus saat pengaturan disimpan.");
+});
+
+qrisForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!qrisSettingsLoaded || qrisImageProcessing) {
+    setQrisStatus("Tunggu sampai pengaturan dan gambar selesai dimuat.", true);
+    return;
+  }
+  const qrisImage = changedQrisImage === null ? savedQrisImage : changedQrisImage;
+  if (qrisEnabledInput.checked && !qrisImage) {
+    setQrisStatus("Unggah gambar QRIS sebelum mengaktifkannya.", true);
+    return;
+  }
+
+  qrisSaveButton.disabled = true;
+  setQrisStatus("Menyimpan pengaturan QRIS...");
+  try {
+    const response = await fetch("/api/payment-settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        qrisEnabled: qrisEnabledInput.checked,
+        qrisImage,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      window.location.replace("/login.html");
+      return;
+    }
+    if (!response.ok) throw new Error(data.error || "Pengaturan QRIS gagal disimpan.");
+
+    savedQrisImage = data.qrisImage;
+    changedQrisImage = null;
+    renderQrisImage(savedQrisImage);
+    qrisImageInput.value = "";
+    setQrisStatus(
+      data.qrisEnabled
+        ? "QRIS aktif di halaman kasir."
+        : "Pengaturan QRIS berhasil disimpan. QRIS saat ini nonaktif."
+    );
+  } catch (error) {
+    setQrisStatus(error.message, true);
+  } finally {
+    qrisSaveButton.disabled = !qrisSettingsLoaded;
+  }
+});
 
 async function loadProfile() {
   try {
@@ -245,3 +391,4 @@ loadProfile().then(() => {
   profileUsername.dataset.savedUsername = profileUsername.value;
   profileBusinessName.dataset.savedBusinessName = profileBusinessName.value;
 });
+loadQrisSettings();

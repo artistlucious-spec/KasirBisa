@@ -14,6 +14,20 @@ window.kasirSessionPromise = fetch("/api/auth/session", { headers: { Accept: "ap
 
     window.kasirSessionData = data;
     document.documentElement.classList.remove("auth-pending");
+    if (data.isAdmin) {
+      const menu = document.getElementById("site-menu");
+      if (menu && !menu.querySelector('a[href="admin.html"]')) {
+        const adminLink = document.createElement("a");
+        adminLink.className = "header-link";
+        adminLink.href = "admin.html";
+        adminLink.textContent = "Admin";
+        if (location.pathname.endsWith("/admin.html")) {
+          adminLink.classList.add("active");
+          adminLink.setAttribute("aria-current", "page");
+        }
+        menu.insertBefore(adminLink, menu.querySelector("#tombol-keluar"));
+      }
+    }
     const renderStoreIdentity = () => {
       const header = document.querySelector(".site-header");
       if (!header || header.querySelector(".header-store-identity")) return;
