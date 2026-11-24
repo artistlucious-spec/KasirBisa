@@ -4,7 +4,7 @@ window.addEventListener("pageshow", (event) => {
   if (event.persisted) window.location.reload();
 });
 
-fetch("/api/auth/session", { headers: { Accept: "application/json" }, cache: "no-store" })
+window.kasirSessionPromise = fetch("/api/auth/session", { headers: { Accept: "application/json" }, cache: "no-store" })
   .then(async (response) => {
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.authenticated) {
@@ -12,7 +12,23 @@ fetch("/api/auth/session", { headers: { Accept: "application/json" }, cache: "no
       return;
     }
 
+    window.kasirSessionData = data;
     document.documentElement.classList.remove("auth-pending");
+    const renderStoreIdentity = () => {
+      const header = document.querySelector(".site-header");
+      if (!header || header.querySelector(".header-store-identity")) return;
+      const link = document.createElement("a");
+      link.className = "header-store-identity";
+      link.href = "profile.html";
+      link.setAttribute("aria-label", "Buka profil toko");
+      const text = document.createElement("span"); text.className = "header-store-name"; text.textContent = data.businessName || "Usaha Anda";
+      const avatar = document.createElement("span"); avatar.className = "header-owner-avatar";
+      if (data.profileImage) { const image = document.createElement("img"); image.src = data.profileImage; image.alt = "Foto pemilik"; avatar.append(image); }
+      else { const initials = document.createElement("span"); initials.textContent = String(data.username || "K").trim().charAt(0).toUpperCase(); avatar.append(initials); }
+      link.append(text, avatar); header.append(link);
+    };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", renderStoreIdentity, { once: true });
+    else renderStoreIdentity();
     const bindLogout = () => {
       const logoutButton = document.getElementById("tombol-keluar");
       logoutButton?.addEventListener("click", async () => {

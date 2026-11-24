@@ -1,6 +1,7 @@
 // Mengelola profil, foto, dan pergantian password melalui API.
 const profileForm = document.getElementById("form-profil");
 const profileUsername = document.getElementById("profil-username");
+const profileBusinessName = document.getElementById("profil-nama-usaha");
 const profileImageInput = document.getElementById("foto-profil");
 const profileImagePreview = document.getElementById("foto-profil-pratinjau");
 const profileInitials = document.getElementById("inisial-profil");
@@ -125,7 +126,7 @@ async function loadProfile() {
     if (!response.ok) throw new Error(data.error || "Profil tidak dapat dimuat.");
 
     profileUsername.value = data.username;
-    document.getElementById("profil-usaha").textContent = data.businessName;
+    profileBusinessName.value = data.businessName || "";
     document.getElementById("profil-whatsapp").textContent = data.whatsapp;
     savedProfileImage = data.profileImage || "";
     profileSupportsPasswordDisplay = Object.prototype.hasOwnProperty.call(data, "password");
@@ -191,9 +192,11 @@ profileForm.addEventListener("submit", async (event) => {
   profileSaveButton.disabled = true;
   setProfileStatus("Menyimpan profil...");
   const credentialsChanged = profileUsername.value.trim() !== profileUsername.dataset.savedUsername || Boolean(newPassword);
+  const businessNameChanged = profileBusinessName.value.trim() !== profileBusinessName.dataset.savedBusinessName;
   try {
     const body = {
       username: profileUsername.value.trim(),
+      businessName: profileBusinessName.value.trim(),
       currentPassword,
       newPassword,
       ...(changedProfileImage === null ? {} : { profileImage: changedProfileImage }),
@@ -212,7 +215,13 @@ profileForm.addEventListener("submit", async (event) => {
 
     profileUsername.value = data.profile.username;
     profileUsername.dataset.savedUsername = data.profile.username;
+    profileBusinessName.value = data.profile.businessName || profileBusinessName.value;
+    profileBusinessName.dataset.savedBusinessName = profileBusinessName.value;
     savedProfileImage = data.profile.profileImage || "";
+    window.kasirSessionData = { ...(window.kasirSessionData || {}), businessName: profileBusinessName.value, profileImage: savedProfileImage, username: data.profile.username };
+    const headerName = document.querySelector(".header-store-name"); if (headerName) headerName.textContent = profileBusinessName.value;
+    const headerAvatar = document.querySelector(".header-owner-avatar");
+    if (headerAvatar) { headerAvatar.replaceChildren(); if (savedProfileImage) { const image = document.createElement("img"); image.src = savedProfileImage; image.alt = "Foto pemilik"; headerAvatar.append(image); } else { const initials = document.createElement("span"); initials.textContent = String(data.profile.username || "K").charAt(0).toUpperCase(); headerAvatar.append(initials); } }
     if (newPassword) savedPassword = newPassword;
     changedProfileImage = null;
     profileImageInput.value = "";
@@ -221,7 +230,9 @@ profileForm.addEventListener("submit", async (event) => {
     setProfileStatus(
       credentialsChanged
         ? "Profil disimpan. Kredensial diperbarui dan sesi login lain telah berakhir."
-        : "Profil berhasil disimpan."
+        : businessNameChanged
+          ? "Nama toko berhasil diperbarui dan akan tampil di seluruh halaman."
+          : "Profil berhasil disimpan."
     );
   } catch (error) {
     setProfileStatus(error.message, true);
@@ -232,4 +243,5 @@ profileForm.addEventListener("submit", async (event) => {
 
 loadProfile().then(() => {
   profileUsername.dataset.savedUsername = profileUsername.value;
+  profileBusinessName.dataset.savedBusinessName = profileBusinessName.value;
 });

@@ -32,6 +32,20 @@ function tampilkanPesan(teks, jenis = "") {
   pesan.className = "notice" + (jenis ? " " + jenis : "");
 }
 
+function tampilkanPesanEditProduk(teks, produk) {
+  const pesan = document.getElementById("pesan");
+  pesan.replaceChildren();
+  const label = document.createElement("span");
+  label.textContent = teks;
+  const tombol = document.createElement("button");
+  tombol.type = "button";
+  tombol.className = "notice-action";
+  tombol.dataset.editQuick = produk.kode;
+  tombol.textContent = "Edit produk";
+  pesan.append(label, tombol);
+  pesan.className = "notice success notice-with-action";
+}
+
 function aturGambarProduk(img, gambar, namaProduk) {
   const punyaFoto = Boolean(gambar);
   img.dataset.placeholder = String(!punyaFoto);
@@ -97,15 +111,7 @@ function renderProduk() {
     tambah.type = "button";
     tambah.dataset.kode = produk.kode;
     tambah.setAttribute("aria-label", `Tambah ${produk.nama} ke keranjang`);
-    const aksi = elemen("div", "product-actions");
-    const edit = elemen("button", "edit-product", "Edit");
-    edit.type = "button";
-    edit.dataset.editProduk = produk.kode;
-    const hapus = elemen("button", "delete-product", "Hapus");
-    hapus.type = "button";
-    hapus.dataset.hapusProduk = produk.kode;
-    aksi.append(edit, hapus);
-    kartu.append(gambar, info, tambah, aksi);
+    kartu.append(gambar, info, tambah);
     elProduk.appendChild(kartu);
   }
 }
@@ -115,8 +121,15 @@ function renderKeranjang() {
   const kosong = keranjang.length === 0;
   document.getElementById("keranjang-kosong").hidden = !kosong;
   document.getElementById("kosongkan-keranjang").disabled = kosong;
-  document.getElementById("jumlah-keranjang").textContent =
-    String(keranjang.reduce((jumlah, item) => jumlah + item.qty, 0));
+  const jumlahItem = keranjang.reduce((jumlah, item) => jumlah + item.qty, 0);
+  document.getElementById("jumlah-keranjang").textContent = String(jumlahItem);
+  const jumlahMobile = document.getElementById("jumlah-keranjang-mobile");
+  const totalMobile = document.getElementById("total-keranjang-mobile");
+  if (jumlahMobile) jumlahMobile.textContent = String(jumlahItem);
+  if (totalMobile) {
+    const ringkasanMobile = KasirLogic.hitungRingkasan(keranjang, elMember.checked);
+    totalMobile.textContent = rupiah(ringkasanMobile.total);
+  }
 
   for (const item of keranjang) {
     const baris = elemen("article", "cart-item");
@@ -184,49 +197,108 @@ function renderPembayaran() {
   renderNominalCepat(total);
 }
 
-function renderRiwayat() {
-  const ringkasan = KasirLogic.hitungRingkasanPenjualan(transaksiTersimpan);
-  document.getElementById("jumlah-transaksi").textContent = String(ringkasan.jumlahTransaksi);
-  document.getElementById("total-penjualan").textContent = rupiah(ringkasan.totalPenjualan);
-  const daftar = document.getElementById("riwayat-transaksi");
-  daftar.replaceChildren();
-  if (transaksiTersimpan.length === 0) {
-    daftar.appendChild(elemen("p", "history-empty", "Belum ada transaksi tersimpan."));
-    return;
-  }
-  for (const transaksi of transaksiTersimpan.slice(-5).reverse()) {
-    const item = elemen("article", "history-item");
-    const produk = Array.isArray(transaksi.items) ? transaksi.items : [];
-    const waktu = new Date(transaksi.waktu);
-    const labelWaktu = Number.isNaN(waktu.getTime()) ? "Waktu tidak tersedia" : waktu.toLocaleString("id-ID");
-    const namaProduk = produk.map((barang) => `${barang.nama} × ${barang.qty}`).join(", ");
-    item.append(
-      elemen("div", "history-detail", `${labelWaktu} · ${namaProduk || "Rincian produk tidak tersedia"}`),
-      elemen("strong", "", rupiah(transaksi.total))
-    );
-    daftar.appendChild(item);
-  }
-}
 
 function render() {
   renderProduk();
   renderKeranjang();
   renderPembayaran();
-  renderRiwayat();
 }
 
+let transaksiUntukStruk = null;
+let infoTokoUntukStruk = null;
 function isiRincian(target, transaksi) {
+  transaksiUntukStruk = transaksi;
   target.replaceChildren();
-  const daftar = transaksi.items.map((item) => `${item.nama} × ${item.qty}`).join(", ");
-  target.append(
-    elemen("p", "", daftar),
-    elemen("p", "", `Subtotal: ${rupiah(transaksi.subtotal)}`),
-    elemen("p", "", `Diskon: -${rupiah(transaksi.diskon)}`),
-    elemen("p", "", `PPN 11%: ${rupiah(transaksi.ppn)}`),
-    elemen("p", "", `Total: ${rupiah(transaksi.total)}`),
-    elemen("p", "", `Uang diterima: ${rupiah(transaksi.dibayar)}`),
-    elemen("p", "", `Kembalian: ${rupiah(transaksi.kembalian)}`)
-  );
+  const store = infoTokoUntukStruk || window.kasirSessionData || {};
+  const card = elemen("article", "receipt-paper");
+  const header = elemen("div", "receipt-brand");
+  header.append(elemen("strong", "", store.businessName || "TOKO ANDA"), elemen("small", "", "Terima kasih telah berbelanja"));
+  const meta = elemen("div", "receipt-meta");
+  const shortId = String(transaksi.id || "").replace(/^TRX-/, "").slice(-8).toUpperCase();
+  meta.append(elemen("span", "", `No. ${shortId || "-"}`), elemen("span", "", new Date(transaksi.waktu).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })));
+  const divider = () => elemen("div", "receipt-divider");
+  const items = elemen("div", "receipt-items");
+  for (const item of transaksi.items || []) {
+    const line = elemen("div", "receipt-item");
+    const left = elemen("div", "receipt-item-name");
+    left.append(elemen("strong", "", item.nama), elemen("small", "", `${item.qty} × ${rupiah(item.harga)}`));
+    line.append(left, elemen("strong", "", rupiah(Number(item.harga) * Number(item.qty)))); items.append(line);
+  }
+  const totals = elemen("div", "receipt-totals");
+  const formatReceiptAmount = (value) => Number(value) < 0 ? `-${rupiah(Math.abs(Number(value)))}` : rupiah(value);
+  const addTotal = (label, value, strong = false) => { const line = elemen("div", strong ? "receipt-total grand" : "receipt-total"); line.append(elemen("span", "", label), elemen("strong", "", formatReceiptAmount(value))); totals.append(line); };
+  addTotal("Subtotal", transaksi.subtotal);
+  if (Number(transaksi.diskon || 0)) addTotal("Diskon", -Number(transaksi.diskon));
+  if (Number(transaksi.ppn || 0)) addTotal("PPN", transaksi.ppn);
+  addTotal("Total", transaksi.total, true);
+  const payment = elemen("div", "receipt-totals receipt-payment");
+  const payLine = (label, value) => { const line = elemen("div", "receipt-total"); line.append(elemen("span", "", label), elemen("strong", "", rupiah(value))); payment.append(line); };
+  payLine("Tunai", transaksi.dibayar); payLine("Kembalian", transaksi.kembalian);
+  const footer = elemen("div", "receipt-footer"); footer.append(elemen("strong", "", "Terima kasih atas kunjungan Anda!"), elemen("small", "", "Semoga hari Anda menyenangkan."));
+  card.append(header, divider(), meta, divider(), elemen("h3", "receipt-items-title", "Rincian belanja"), items, divider(), totals, payment, divider(), footer);
+  target.append(card);
+}
+
+async function loadStoreInfoForReceipt() {
+  if (infoTokoUntukStruk) return infoTokoUntukStruk;
+  if (window.kasirSessionData) { infoTokoUntukStruk = window.kasirSessionData; return infoTokoUntukStruk; }
+  try { const response = await fetch("/api/auth/session", { cache: "no-store" }); if (response.ok) infoTokoUntukStruk = await response.json(); } catch {}
+  return infoTokoUntukStruk || {};
+}
+
+function buatCanvasStruk(transaksi) {
+  const width = 720, padding = 54, contentWidth = width - padding * 2;
+  const canvas = document.createElement("canvas"); canvas.width = width;
+  const measure = document.createElement("canvas").getContext("2d");
+  const store = infoTokoUntukStruk?.businessName || "TOKO ANDA";
+  const date = new Date(transaksi.waktu).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+  const ops = []; let y = padding;
+  const addText = (value, x, yy, font, color = "#182433", align = "left") => ops.push({ type: "text", value: String(value), x, y: yy, font, color, align });
+  const addRule = () => { ops.push({ type: "rule", y }); y += 30; };
+  const wrap = (value, maxWidth, font) => { measure.font = font; let line = "", out = []; for (const word of String(value).split(/\s+/)) { const next = line ? `${line} ${word}` : word; if (measure.measureText(next).width > maxWidth && line) { out.push(line); line = word; } else line = next; } if (line) out.push(line); return out; };
+  addText(store, width/2, y, "bold 34px Arial", "#14243a", "center"); y += 36;
+  addText("Terima kasih telah berbelanja", width/2, y, "20px Arial", "#667085", "center"); y += 30; addRule();
+  addText(`No. ${String(transaksi.id || "").replace(/^TRX-/, "").slice(-8).toUpperCase()}`, padding, y, "18px Arial");
+  addText(date, width-padding, y, "18px Arial", "#667085", "right"); y += 34; addRule();
+  addText("RINCIAN BELANJA", padding, y, "bold 19px Arial", "#667085"); y += 34;
+  for (const item of transaksi.items || []) {
+    const lines = wrap(item.nama, contentWidth - 220, "bold 21px Arial");
+    lines.forEach((line, index) => addText(line, padding, y + index*27, "bold 21px Arial"));
+    addText(rupiah(Number(item.harga) * Number(item.qty)), width-padding, y, "bold 21px Arial", "#182433", "right");
+    y += Math.max(30, lines.length*27); addText(`${item.qty} × ${rupiah(item.harga)}`, padding, y, "17px Arial", "#667085"); y += 34;
+  }
+  addRule();
+  const formatReceiptAmount = (value) => Number(value) < 0 ? `-${rupiah(Math.abs(Number(value)))}` : rupiah(value);
+  const total = (label, value, bold = false) => { addText(label, padding, y, `${bold ? "bold " : ""}20px Arial`, bold ? "#14243a" : "#667085"); addText(formatReceiptAmount(value), width-padding, y, `${bold ? "bold " : ""}${bold ? 27 : 20}px Arial`, bold ? "#1769c2" : "#182433", "right"); y += bold ? 42 : 32; };
+  total("Subtotal", transaksi.subtotal); if (Number(transaksi.diskon || 0)) total("Diskon", -Number(transaksi.diskon));
+  if (Number(transaksi.ppn || 0)) total("PPN", transaksi.ppn); total("TOTAL", transaksi.total, true);
+  y += 8; total("Tunai", transaksi.dibayar); total("Kembalian", transaksi.kembalian); y += 14; addRule();
+  addText("Terima kasih atas kunjungan Anda!", width/2, y, "bold 21px Arial", "#14243a", "center"); y += 30;
+  addText("Semoga hari Anda menyenangkan.", width/2, y, "18px Arial", "#667085", "center");
+  canvas.height = y + padding;
+  const ctx = canvas.getContext("2d"); ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, width, canvas.height);
+  for (const op of ops) {
+    if (op.type === "rule") { ctx.strokeStyle = "#d7dee8"; ctx.setLineDash([5, 5]); ctx.beginPath(); ctx.moveTo(padding, op.y); ctx.lineTo(width-padding, op.y); ctx.stroke(); ctx.setLineDash([]); }
+    else { ctx.font = op.font; ctx.fillStyle = op.color; ctx.textAlign = op.align; ctx.fillText(op.value, op.x, op.y); }
+  }
+  return canvas;
+}
+
+async function getStrukBlob() {
+  if (!transaksiUntukStruk) throw new Error("Belum ada struk transaksi.");
+  await loadStoreInfoForReceipt();
+  const canvas = buatCanvasStruk(transaksiUntukStruk);
+  return await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("Gambar struk tidak dapat dibuat.")),"image/png"));
+}
+async function simpanStruk() {
+  try { const blob=await getStrukBlob(); const url=URL.createObjectURL(blob); const link=document.createElement("a"); link.href=url; link.download=`struk-${String(transaksiUntukStruk.id||"transaksi").slice(-8)}.png`; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1500); tampilkanPesan("Struk berhasil disiapkan sebagai gambar PNG.","success"); }
+  catch(error){tampilkanPesan(error.message,"error");}
+}
+async function bagikanStruk() {
+  try { const blob=await getStrukBlob(); const file=new File([blob],`struk-${String(transaksiUntukStruk.id||"transaksi").slice(-8)}.png`,{type:"image/png"});
+    if(navigator.canShare?.({files:[file]})&&navigator.share){await navigator.share({files:[file],title:"Struk KASIR BISA",text:"Terima kasih telah berbelanja."});}
+    else {const textShare=`Struk transaksi ${String(transaksiUntukStruk.id||"").slice(-8)}\nTotal: ${rupiah(transaksiUntukStruk.total)}\nTerima kasih telah berbelanja.`;window.location.href = `https://wa.me/?text=${encodeURIComponent(textShare)}`;tampilkanPesan("Browser belum mendukung berbagi gambar langsung. WhatsApp dibuka dengan ringkasan teks; gambar dapat disimpan lalu dilampirkan.","success");}
+  } catch(error){if(error.name!=="AbortError")tampilkanPesan(error.message,"error");}
 }
 
 async function putarSuaraTransaksiSukses() {
@@ -268,19 +340,6 @@ async function muatProduk() {
   }
 }
 
-async function muatTransaksi() {
-  try {
-    const transaksi = await requestApi("/api/transactions");
-    if (Array.isArray(transaksi)) {
-      transaksiTersimpan = transaksi;
-      pesanKesalahanPenyimpanan = "";
-      render();
-    }
-  } catch (error) {
-    pesanKesalahanPenyimpanan = error.message;
-    tampilkanPesan(`Database transaksi tidak dapat dimuat: ${error.message}`, "error");
-  }
-}
 
 function bukaDialogProduk(kode = "") {
   const dialog = document.getElementById("dialog-produk");
@@ -317,6 +376,8 @@ async function hapusProduk(kode) {
 let mediaStream = null;
 let barcodeDetector = null;
 let pemindaianAktif = false;
+let barcodeTerakhir = "";
+let waktuBarcodeTerakhir = 0;
 
 async function nyalakanKamera() {
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -348,6 +409,8 @@ async function nyalakanKamera() {
 
 function matikanKamera() {
   pemindaianAktif = false;
+  barcodeTerakhir = "";
+  waktuBarcodeTerakhir = 0;
   if (mediaStream) mediaStream.getTracks().forEach((track) => track.stop());
   mediaStream = null;
   document.getElementById("kamera").srcObject = null;
@@ -371,6 +434,10 @@ async function pindaiFrame() {
 function prosesBarcode(barcode) {
   const kode = String(barcode || "").trim();
   if (!kode) return;
+  const sekarang = Date.now();
+  if (kode === barcodeTerakhir && sekarang - waktuBarcodeTerakhir < 1400) return;
+  barcodeTerakhir = kode;
+  waktuBarcodeTerakhir = sekarang;
   document.getElementById("barcode-terbaca").textContent = `Terbaca: ${kode}`;
   const produk = KasirLogic.cariProdukByBarcode(kode);
   if (!produk) {
@@ -391,7 +458,7 @@ function prosesBarcode(barcode) {
     return;
   }
   KasirLogic.tambahItem(keranjang, produk.kode);
-  tampilkanPesan(`${produk.nama} ditambahkan ke keranjang.`, "success");
+  tampilkanPesanEditProduk(`${produk.nama} ditambahkan · ${rupiah(produk.harga)} · stok ${Math.max(0, Number(produk.stock || 0) - (keranjang.find((item) => item.kode === produk.kode)?.qty || 0))}.`, produk);
   render();
 }
 
@@ -427,6 +494,7 @@ async function konfirmasiPembayaran() {
       }),
     });
     const transaksiBaru = hasil.transaksi;
+    await loadStoreInfoForReceipt();
     isiRincian(document.getElementById("rincian-struk"), transaksiBaru);
     transaksiMenunggu = null;
     keranjang = [];
@@ -434,7 +502,7 @@ async function konfirmasiPembayaran() {
     elMember.checked = false;
     document.getElementById("langkah-konfirmasi").hidden = true;
     document.getElementById("langkah-struk").hidden = false;
-    await Promise.all([muatProduk(), muatTransaksi()]);
+    await muatProduk();
     const suaraDiputar = await putarSuaraTransaksiSukses();
     tampilkanPesan(
       suaraDiputar
@@ -449,16 +517,6 @@ async function konfirmasiPembayaran() {
 }
 
 elProduk.addEventListener("click", (event) => {
-  const tombolEdit = event.target.closest("[data-edit-produk]");
-  if (tombolEdit) {
-    bukaDialogProduk(tombolEdit.dataset.editProduk);
-    return;
-  }
-  const tombolHapus = event.target.closest("[data-hapus-produk]");
-  if (tombolHapus) {
-    hapusProduk(tombolHapus.dataset.hapusProduk);
-    return;
-  }
   const tombol = event.target.closest("[data-kode]");
   if (!tombol) return;
   try {
@@ -469,11 +527,17 @@ elProduk.addEventListener("click", (event) => {
       throw new Error(`Jumlah ${produk.nama} sudah mencapai stok tersedia`);
     }
     KasirLogic.tambahItem(keranjang, tombol.dataset.kode);
-    tampilkanPesan(`${KasirLogic.cariProduk(tombol.dataset.kode).nama} ditambahkan ke keranjang.`, "success");
+    const terpilih = KasirLogic.cariProduk(tombol.dataset.kode);
+    tampilkanPesanEditProduk(`${terpilih.nama} ditambahkan · ${rupiah(terpilih.harga)} · stok ${Math.max(0, Number(terpilih.stock || 0) - (keranjang.find((item) => item.kode === terpilih.kode)?.qty || 0))}.`, terpilih);
     render();
   } catch (error) {
     tampilkanPesan(error.message, "error");
   }
+});
+
+document.getElementById("pesan").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-edit-quick]");
+  if (button) bukaDialogProduk(button.dataset.editQuick);
 });
 
 elKeranjang.addEventListener("click", (event) => {
@@ -523,6 +587,9 @@ document.getElementById("batal-konfirmasi").addEventListener("click", () => {
   elDialog.close();
 });
 document.getElementById("tutup-struk").addEventListener("click", () => elDialog.close());
+document.getElementById("simpan-struk").addEventListener("click", simpanStruk);
+document.getElementById("bagikan-struk").addEventListener("click", bagikanStruk);
+document.getElementById("cetak-struk").addEventListener("click", () => window.print());
 document.getElementById("kosongkan-keranjang").addEventListener("click", () => {
   keranjang = [];
   elBayar.value = "";
@@ -533,7 +600,30 @@ elDialog.addEventListener("close", () => {
   transaksiMenunggu = null;
 });
 
-document.getElementById("tombol-tambah-produk").addEventListener("click", () => bukaDialogProduk());
+const tombolKeranjangMobile = document.getElementById("tombol-keranjang-mobile");
+const panelKeranjang = document.getElementById("panel-keranjang");
+const tombolTutupKeranjang = document.getElementById("tutup-keranjang-mobile");
+const latarKeranjangMobile = document.getElementById("latar-keranjang-mobile");
+
+function aturPanelKeranjangMobile(buka) {
+  if (!tombolKeranjangMobile || !panelKeranjang) return;
+  panelKeranjang.classList.toggle("is-open", buka);
+  tombolKeranjangMobile.setAttribute("aria-expanded", String(buka));
+  document.body.classList.toggle("cart-open", buka);
+}
+
+tombolKeranjangMobile?.addEventListener("click", () => {
+  aturPanelKeranjangMobile(!panelKeranjang.classList.contains("is-open"));
+});
+tombolTutupKeranjang?.addEventListener("click", () => aturPanelKeranjangMobile(false));
+latarKeranjangMobile?.addEventListener("click", () => aturPanelKeranjangMobile(false));
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") aturPanelKeranjangMobile(false);
+});
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 700) aturPanelKeranjangMobile(false);
+});
+
 document.getElementById("batal-produk").addEventListener("click", () => {
   document.getElementById("dialog-produk").close();
 });
@@ -595,10 +685,27 @@ document.getElementById("form-produk").addEventListener("submit", async (event) 
         ...(gambarProdukPerubahan === null ? {} : { gambar: gambarProdukPerubahan }),
       }),
     };
+    const produkSebelum = kode ? KasirLogic.cariProduk(kode) : null;
+    const hargaLama = produkSebelum ? Number(produkSebelum.harga) : null;
     await requestApi(kode ? `/api/products/${encodeURIComponent(kode)}` : "/api/products", options);
     await muatProduk();
+    const produkTerbaru = kode ? KasirLogic.cariProduk(kode) : null;
+    const itemKeranjang = kode ? keranjang.find(item => item.kode === kode) : null;
+    let pesanSimpan = `${nama} berhasil disimpan ke katalog.`;
+    if (produkTerbaru && itemKeranjang) {
+      itemKeranjang.nama = produkTerbaru.nama;
+      itemKeranjang.kategori = produkTerbaru.kategori;
+      itemKeranjang.harga = produkTerbaru.harga;
+      itemKeranjang.gambar = produkTerbaru.gambar;
+      const hargaBerubah = hargaLama !== Number(produkTerbaru.harga);
+      const stokKurang = Number(produkTerbaru.stock || 0) < itemKeranjang.qty;
+      if (hargaBerubah) pesanSimpan = `Harga ${produkTerbaru.nama} berubah dari ${rupiah(hargaLama)} menjadi ${rupiah(produkTerbaru.harga)}. Keranjang telah diperbarui.`;
+      else pesanSimpan = `${produkTerbaru.nama} diperbarui. Informasi di keranjang ikut diperbarui.`;
+      if (stokKurang) pesanSimpan += ` Perhatian: stok sekarang ${produkTerbaru.stock} unit, sedangkan keranjang berisi ${itemKeranjang.qty}. Sesuaikan jumlah sebelum pembayaran.`;
+    }
     document.getElementById("dialog-produk").close();
-    tampilkanPesan(`${nama} berhasil disimpan ke katalog.`, "success");
+    tampilkanPesan(pesanSimpan, "success");
+    render();
   } catch (error) {
     tampilkanPesan(error.message, "error");
   }
@@ -614,4 +721,4 @@ document.getElementById("form-barcode").addEventListener("submit", (event) => {
   document.getElementById("input-barcode").value = "";
 });
 
-Promise.all([muatProduk(), muatTransaksi()]);
+muatProduk();

@@ -10,7 +10,23 @@ function showMessage(text, isError = true) {
   message.className = `login-message${isError ? " error" : ""}`;
 }
 
+function openedDirectlyFromFile() {
+  return window.location.protocol === "file:";
+}
+
+function showServerRequiredMessage() {
+  showMessage(
+    "Aplikasi sedang dibuka langsung dari file. Jalankan server Kasir Bisa terlebih dahulu dengan perintah npm run dev, lalu buka alamat lokal yang ditampilkan Wrangler."
+  );
+}
+
 async function checkExistingSession() {
+  if (openedDirectlyFromFile()) {
+    showServerRequiredMessage();
+    submitButton.disabled = true;
+    return;
+  }
+
   try {
     const response = await fetch("/api/auth/session", {
       headers: { Accept: "application/json" },
@@ -29,6 +45,10 @@ async function checkExistingSession() {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (openedDirectlyFromFile()) {
+    showServerRequiredMessage();
+    return;
+  }
   if (!form.reportValidity()) return;
 
   submitButton.disabled = true;

@@ -14,17 +14,21 @@
   <header class="site-header">
     <a class="brand" href="index.html" aria-label="Kasir Bisa, kembali ke kasir">
       <img class="brand-logo" src="icon/Favicon.png" alt="" aria-hidden="true">
-      <span><strong>Kasir Bisa</strong><small>Kasir kantin sederhana</small></span>
+      <span><strong>Kasir Bisa</strong><small>Asisten usaha Anda</small></span>
     </a>
     <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Buka menu" aria-controls="site-menu" aria-expanded="false">
       <span></span><span></span><span></span>
     </button>
     <nav id="site-menu" class="header-nav" aria-label="Navigasi utama" hidden>
       <a class="header-link" href="index.html">Kasir</a>
-      <a class="header-link" href="rekap.html">Rekap</a>
+      <a class="header-link" href="produk.html">Produk &amp; Stok</a>
+      <a class="header-link" href="riwayat.html">Riwayat Transaksi</a>
+      <a class="header-link" href="laporan.html">Laporan Penjualan</a>
       <a class="header-link" href="smart-insight.html">Smart Insight</a>
+      <a class="header-link" href="pusat-perhatian.html">Pusat Perhatian Toko <span id="store-alert-badge" class="count-badge" hidden>0</span></a>
+      <a class="header-link" href="tanya-smart-insight.html">Tanya Smart Insight</a>
       <a class="header-link" href="panduan.html">Panduan</a>
-      <a class="header-link active" href="profile.html">Profil</a>
+      <a class="header-link" href="profile.html">Profil Usaha</a>
       <button id="tombol-keluar" class="header-link logout-button" type="button">Keluar</button>
     </nav>
   </header>
@@ -32,14 +36,14 @@
   <main>
     <section class="profile-page-heading">
       <p class="eyebrow">AKUN PEMILIK</p>
-      <h1>Profil</h1>
-      <p>Perbarui nama pengguna, password, dan foto profil akun Kasir Bisa.</p>
+      <h1>Profil Usaha</h1>
+      <p>Perbarui nama toko, nama pengguna, password, dan foto profil pemilik.</p>
     </section>
 
     <section class="profile-card" aria-labelledby="profile-form-title">
       <form id="form-profil">
         <h2 id="profile-form-title">Informasi akun</h2>
-        <p><strong>Nama usaha:</strong> <span id="profil-usaha">-</span></p>
+        <div class="profile-fields business-name-field"><label for="profil-nama-usaha">Nama toko / usaha<input id="profil-nama-usaha" type="text" maxlength="120" autocomplete="organization" required></label><small>Nama ini akan ditampilkan pada header aplikasi dan struk transaksi.</small></div>
         <p><strong>WhatsApp:</strong> <span id="profil-whatsapp">-</span></p>
         <div class="profile-photo-row">
           <div class="profile-avatar">
