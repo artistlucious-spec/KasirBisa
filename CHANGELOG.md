@@ -16,6 +16,10 @@ Perubahan penting pada website dicatat di sini.
 - Checkout memilih satu QR aktif, tetap memerlukan pengecekan pembayaran manual, dan mencatat nama QR pada struk serta riwayat/CSV.
 - Menambahkan migrasi `0009_multiple_payment_qrs.sql`; migrasi ini perlu diterapkan terpisah pada D1 Cloudflare. Tidak ada migrasi remote atau deploy yang dilakukan.
 
+## Pemilihan area gambar QRIS tanpa menghapus gambar asli
+- QRIS yang ditampilkan mengikuti area terpilih, sementara gambar sumber utuh dan posisi seleksi disimpan agar pilihan dapat diubah saat pengeditan berikutnya.
+- Menambahkan migrasi `0010_nondestructive_qr_selection.sql`; perlu diterapkan terpisah pada D1 sebelum source terbaru digunakan.
+
 ## Nama metode pembayaran dikembalikan ke QRIS
 - Mengembalikan label metode, pengaturan, pesan, struk, dan riwayat dari "QR Pembayaran" ke "QRIS" sesuai keputusan pengguna.
 - Fitur tetap hanya mendukung satu gambar QRIS per usaha; usulan multi-QR ditunda. Tidak ada perubahan skema database.

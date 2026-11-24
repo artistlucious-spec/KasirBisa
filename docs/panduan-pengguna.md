@@ -13,7 +13,7 @@ Produk, stok, dan transaksi tersimpan di akun usaha Anda dan terpisah dari usaha
 1. Buka menu (ikon tiga garis) dan pilih **Profil Usaha**.
 2. Ubah nama usaha, nama pengguna, atau foto profil, lalu simpan perubahan. Foto JPG, PNG, atau WebP diperkecil otomatis.
 3. Password tersimpan ditampilkan sebagai titik-titik; tekan ikon mata untuk melihatnya. Akun lama perlu masuk kembali sekali setelah pembaruan agar password dapat ditampilkan. Untuk mengganti password, pilih **Ganti password**, isi password saat ini untuk verifikasi, lalu masukkan password baru minimal 12 karakter dan ulangi.
-4. QRIS tidak lagi diatur dari Profil Usaha. Kelola daftar QRIS melalui tombol **Tambah QRIS** atau **Lihat QRIS** pada bagian pembayaran di halaman Kasir.
+4. QRIS tidak lagi diatur dari Profil Usaha. Pilih opsi **QRIS** di bagian pembayaran Kasir untuk menampilkan tombol **Tambah QRIS** dan **Lihat QRIS**, lalu kelola daftarnya dari sana.
 5. Nama usaha dan foto profil ditampilkan pada header dan struk. Jika nama pengguna atau password berubah, sesi pada perangkat lain akan berakhir.
 
 ## Produk dan stok
@@ -30,7 +30,7 @@ Produk, stok, dan transaksi tersimpan di akun usaha Anda dan terpisah dari usaha
 2. Periksa isi keranjang dan sesuaikan jumlah. Produk tanpa stok tidak dapat dijual.
 3. Centang **Pelanggan member** jika sesuai. Member mendapat diskon 10%; non-member mendapat diskon 5% jika subtotal minimal Rp100.000. PPN 11% ditampilkan pada ringkasan.
 4. Pilih **Tunai** atau **QRIS**. Untuk tunai, masukkan uang yang diterima atau pilih nominal cepat. Untuk QRIS, pilih QR bernama yang akan dipakai dan tampilkan gambarnya kepada pelanggan.
-5. Untuk menambah QR, pilih **Tambah QRIS**; untuk melihat, mengubah nama/gambar, mengaktifkan, menonaktifkan, atau menghapus QR, pilih **Lihat QRIS**. Saat menambah atau mengganti gambar, geser kotak crop dan tarik sudutnya untuk memilih bagian yang disimpan. Maksimal 10 QR per usaha.
+5. Setelah memilih QRIS, gunakan **Tambah QRIS** untuk menambah QR; pilih **Lihat QRIS** untuk melihat, mengubah nama/gambar, mengaktifkan, menonaktifkan, atau menghapus QR. Saat menambah atau mengganti gambar, tarik titik sudut/sisi kotak crop untuk memilih bagian yang disimpan. Maksimal 10 QR per usaha.
 6. Sebelum menyimpan pembayaran QR, periksa aplikasi bank atau dompet digital dan pastikan dana benar-benar diterima. Konfirmasi pembayaran QR dilakukan secara manual; tidak ada gateway atau konfirmasi otomatis.
 7. Setelah transaksi berhasil, stok otomatis berkurang dan struk mencatat nama QR yang dipilih. Struk dapat disimpan sebagai gambar, dibagikan, atau dicetak.
 

@@ -13,6 +13,7 @@ Kasir Bisa Web menggunakan Cloudflare D1 melalui binding `DB`. Konfigurasi datab
 - `0007_payment_methods.sql`: mencatat metode pembayaran pada transaksi dan menyimpan gambar serta status QRIS per usaha.
 - `0008_admin_accounts.sql`: menambahkan status aktif/nonaktif akun untuk pengelolaan akses admin.
 - `0009_multiple_payment_qrs.sql`: menambahkan daftar hingga 10 QRIS bernama per usaha, memindahkan gambar QRIS lama, dan menyimpan label QR yang dipakai pada transaksi.
+- `0010_nondestructive_qr_selection.sql`: menyimpan gambar sumber utuh dan area QR terpilih terpisah agar area di luar pilihan tetap dapat digunakan saat mengedit.
 
 Jalankan `npm run d1:migrate:local` untuk D1 lokal. Database Cloudflare remote tidak membuat tabel secara otomatis ketika kode di-deploy; migrasi perlu diterapkan secara terpisah. Untuk target pada `wrangler.toml`, periksa dahulu nama dan ID database, lalu jalankan `npx wrangler d1 migrations apply kasirbisa --remote` dari folder project ini (atau `npm run d1:migrate:remote`). Jangan jalankan perintah remote sebelum memastikan akun Cloudflare dan database yang dituju adalah target yang benar. Setelah menerapkan `0005_password_encrypted.sql`, pengguna lama harus login kembali agar aplikasi dapat membuat salinan password terenkripsi dari password yang baru diverifikasi.
 
@@ -40,7 +41,7 @@ Tabel lama untuk satu QRIS per usaha. Pada migrasi `0009`, gambar QRIS yang ters
 
 ### `business_payment_qrs`
 
-Menyimpan daftar QRIS statis per usaha: ID, nama, gambar, status aktif, dan waktu pembuatan/perubahan. Nama unik tanpa membedakan kapitalisasi untuk tiap usaha; aplikasi membatasi jumlah hingga 10 QR per usaha. Setiap perubahan dibatasi oleh `business_id` sesi pemilik. Pembayaran QRIS tetap diperiksa secara manual oleh kasir sebelum transaksi disimpan.
+Menyimpan daftar QRIS statis per usaha: ID, nama, gambar area terpilih untuk ditampilkan, gambar sumber utuh, data koordinat area terpilih, status aktif, dan waktu pembuatan/perubahan. Gambar sumber dipakai ketika QR diedit ulang sehingga area di luar pilihan tidak hilang. Nama unik tanpa membedakan kapitalisasi untuk tiap usaha; aplikasi membatasi jumlah hingga 10 QR per usaha. Setiap perubahan dibatasi oleh `business_id` sesi pemilik. Pembayaran QRIS tetap diperiksa secara manual oleh kasir sebelum transaksi disimpan.
 
 ### `transaction_items`
 

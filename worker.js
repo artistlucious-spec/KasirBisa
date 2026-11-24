@@ -1004,10 +1004,34 @@ function validQrisName(name) {
   return typeof name === "string" && name.trim().length > 0 && name.trim().length <= 40;
 }
 
+function validQrisCropSelection(selection) {
+  return selection !== null
+    && typeof selection === "object"
+    && ["x", "y", "w", "h"].every((key) => Number.isFinite(selection[key]))
+    && selection.x >= 0
+    && selection.y >= 0
+    && selection.w > 0
+    && selection.h > 0
+    && selection.x + selection.w <= 1
+    && selection.y + selection.h <= 1;
+}
+
+function parseQrisCropSelection(value) {
+  try {
+    const selection = JSON.parse(value);
+    return validQrisCropSelection(selection)
+      ? { x: selection.x, y: selection.y, w: selection.w, h: selection.h }
+      : { x: 0, y: 0, w: 1, h: 1 };
+  } catch {
+    return { x: 0, y: 0, w: 1, h: 1 };
+  }
+}
+
 async function paymentSettingsApi(request, env, businessId) {
   if (request.method === "GET") {
+    const includeSourceImage = new URL(request.url).searchParams.get("includeSource") === "1";
     const result = await env.DB.prepare(
-      `SELECT id, name, image, is_enabled, created_at, updated_at
+      `SELECT id, name, image, source_image, crop_selection, is_enabled, created_at, updated_at
        FROM business_payment_qrs
        WHERE business_id = ?
        ORDER BY created_at, name`
@@ -1017,6 +1041,10 @@ async function paymentSettingsApi(request, env, businessId) {
         id: row.id,
         name: row.name,
         image: row.image,
+        ...(includeSourceImage ? {
+          sourceImage: row.source_image || row.image,
+          cropSelection: parseQrisCropSelection(row.crop_selection),
+        } : {}),
         enabled: Boolean(row.is_enabled),
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -1030,11 +1058,20 @@ async function paymentSettingsApi(request, env, businessId) {
   if (request.method === "POST") {
     const name = typeof body?.name === "string" ? body.name.trim() : "";
     const image = typeof body?.image === "string" ? body.image : "";
+    const sourceImage = typeof body?.sourceImage === "string" ? body.sourceImage : image;
+    const cropSelection = body?.cropSelection === undefined
+      ? { x: 0, y: 0, w: 1, h: 1 }
+      : body.cropSelection;
     const enabled = body?.enabled === undefined ? true : body.enabled;
-    if (!validQrisName(name) || typeof body?.image !== "string" || typeof enabled !== "boolean") {
+    if (
+      !validQrisName(name)
+      || typeof body?.image !== "string"
+      || typeof enabled !== "boolean"
+      || !validQrisCropSelection(cropSelection)
+    ) {
       return json({ error: "Nama, gambar, atau status QRIS tidak valid." }, 400);
     }
-    if (!image || !validQrisImage(image)) {
+    if (!image || !validQrisImage(image) || !sourceImage || !validQrisImage(sourceImage)) {
       return json({ error: "Gambar QRIS tidak valid atau terlalu besar." }, 400);
     }
     const [count, duplicate] = await Promise.all([
@@ -1051,15 +1088,31 @@ async function paymentSettingsApi(request, env, businessId) {
     if (duplicate) return json({ error: "Nama QRIS sudah digunakan. Pilih nama lain." }, 409);
     const id = `QR-${crypto.randomUUID()}`;
     await env.DB.prepare(
-      "INSERT INTO business_payment_qrs (id, business_id, name, image, is_enabled) VALUES (?, ?, ?, ?, ?)"
-    ).bind(id, businessId, name, image, enabled ? 1 : 0).run();
+      `INSERT INTO business_payment_qrs
+       (id, business_id, name, image, source_image, crop_selection, is_enabled)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(id, businessId, name, image, sourceImage, JSON.stringify(cropSelection), enabled ? 1 : 0).run();
     return json({ success: true, qr: { id, name, image, enabled } }, 201);
   }
 
   if (request.method === "PUT") {
     const id = typeof body?.id === "string" ? body.id.trim() : "";
     const name = typeof body?.name === "string" ? body.name.trim() : "";
-    if (!id || id.length > 128 || !validQrisName(name) || typeof body?.image !== "string" || !validQrisImage(body.image) || !body.image) {
+    const sourceImage = typeof body?.sourceImage === "string" ? body.sourceImage : body?.image;
+    const cropSelection = body?.cropSelection === undefined
+      ? { x: 0, y: 0, w: 1, h: 1 }
+      : body.cropSelection;
+    if (
+      !id
+      || id.length > 128
+      || !validQrisName(name)
+      || typeof body?.image !== "string"
+      || !validQrisImage(body.image)
+      || !body.image
+      || !validQrisImage(sourceImage)
+      || !sourceImage
+      || !validQrisCropSelection(cropSelection)
+    ) {
       return json({ error: "Nama, gambar, atau QRIS yang dipilih tidak valid." }, 400);
     }
     const [existing, duplicate] = await Promise.all([
@@ -1073,9 +1126,10 @@ async function paymentSettingsApi(request, env, businessId) {
     if (!existing) return json({ error: "QRIS tidak ditemukan pada usaha ini." }, 404);
     if (duplicate) return json({ error: "Nama QRIS sudah digunakan. Pilih nama lain." }, 409);
     await env.DB.prepare(
-      `UPDATE business_payment_qrs SET name = ?, image = ?, updated_at = CURRENT_TIMESTAMP
+      `UPDATE business_payment_qrs
+       SET name = ?, image = ?, source_image = ?, crop_selection = ?, updated_at = CURRENT_TIMESTAMP
        WHERE business_id = ? AND id = ?`
-    ).bind(name, body.image, businessId, id).run();
+    ).bind(name, body.image, sourceImage, JSON.stringify(cropSelection), businessId, id).run();
     return json({ success: true });
   }
 
