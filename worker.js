@@ -520,7 +520,7 @@ async function adminAccountsApi(request, env, adminUser) {
          FROM users`
       ).first(),
       env.DB.prepare(
-        `SELECT users.id, users.username, users.created_at, users.is_active,
+        `SELECT users.id, users.business_id, users.username, users.whatsapp, users.created_at, users.is_active,
           businesses.name AS business_name,
           (SELECT COUNT(*) FROM products WHERE products.business_id = users.business_id) AS product_count,
           (SELECT COUNT(*) FROM transactions WHERE transactions.business_id = users.business_id) AS transaction_count
@@ -534,7 +534,9 @@ async function adminAccountsApi(request, env, adminUser) {
     return json({
       accounts: (result.results || []).map((account) => ({
         id: account.id,
+        businessId: account.business_id,
         username: account.username,
+        whatsapp: account.whatsapp || "",
         businessName: account.business_name,
         createdAt: account.created_at,
         active: Number(account.is_active) === 1,
@@ -556,29 +558,381 @@ async function adminAccountsApi(request, env, adminUser) {
   if (request.method === "PATCH") {
     const body = await parseJsonBody(request);
     const userId = typeof body?.userId === "string" ? body.userId : "";
-    if (!/^[\w-]{1,128}$/.test(userId) || typeof body?.active !== "boolean") {
-      return json({ error: "Perubahan status akun tidak valid." }, 400);
+    if (!/^[\w-]{1,128}$/.test(userId)) {
+      return json({ error: "Akun yang dipilih tidak valid." }, 400);
     }
 
     const target = await env.DB.prepare(
-      "SELECT id, username, is_active FROM users WHERE id = ?"
+      "SELECT id, business_id, username, is_active FROM users WHERE id = ?"
     ).bind(userId).first();
     if (!target) return json({ error: "Akun tidak ditemukan." }, 404);
     if (target.id === adminUser.id || isAdminUser(target, env)) {
-      return json({ error: "Akun admin utama tidak dapat dinonaktifkan dari halaman ini." }, 400);
-    }
-    if ((Number(target.is_active) === 1) === body.active) {
-      return json({ success: true, active: body.active, unchanged: true });
+      return json({ error: "Akun admin utama tidak dapat diubah dari halaman ini." }, 400);
     }
 
+    if (typeof body.active === "boolean") {
+      if ((Number(target.is_active) === 1) === body.active) {
+        return json({ success: true, active: body.active, unchanged: true });
+      }
+      const result = await env.DB.prepare(
+        "UPDATE users SET is_active = ?, session_version = session_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+      ).bind(body.active ? 1 : 0, target.id).run();
+      if (!result.meta.changes) return json({ error: "Status akun tidak berhasil diperbarui." }, 500);
+      return json({ success: true, active: body.active });
+    }
+
+    const businessName = typeof body.businessName === "string" ? body.businessName.trim() : "";
+    if (!businessName || businessName.length > 120) {
+      return json({ error: "Nama usaha wajib diisi dan maksimal 120 karakter." }, 400);
+    }
     const result = await env.DB.prepare(
-      "UPDATE users SET is_active = ?, session_version = session_version + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-    ).bind(body.active ? 1 : 0, target.id).run();
-    if (!result.meta.changes) return json({ error: "Status akun tidak berhasil diperbarui." }, 500);
-    return json({ success: true, active: body.active });
+      "UPDATE businesses SET name = ? WHERE id = ?"
+    ).bind(businessName, target.business_id).run();
+    if (!result.meta.changes) return json({ error: "Nama usaha tidak berhasil diperbarui." }, 500);
+    return json({ success: true, businessName });
   }
 
   return json({ error: "Metode tidak didukung." }, 405, { Allow: "GET, PATCH" });
+}
+
+async function adminDataApi(request, env) {
+  const url = new URL(request.url);
+  const resource = url.searchParams.get("resource") || "";
+  const search = (url.searchParams.get("q") || "").trim().slice(0, 100);
+  const offset = Number(url.searchParams.get("offset") || 0);
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > 1_000_000) {
+    return json({ error: "Halaman data tidak valid." }, 400);
+  }
+
+  if (resource === "products" && request.method === "GET") {
+    const where = search
+      ? "WHERE instr(lower(products.name), lower(?)) > 0 OR instr(lower(products.code), lower(?)) > 0 OR instr(lower(products.barcode), lower(?)) > 0 OR instr(lower(businesses.name), lower(?)) > 0 OR instr(lower(users.username), lower(?)) > 0"
+      : "";
+    const bindings = search ? [search, search, search, search, search] : [];
+    const [count, summary, result] = await Promise.all([
+      env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM products
+         JOIN businesses ON businesses.id = products.business_id
+         JOIN users ON users.business_id = businesses.id
+         ${where}`
+      ).bind(...bindings).first(),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS total,
+          COALESCE(SUM(CASE WHEN stock <= 5 THEN 1 ELSE 0 END), 0) AS lowStock
+         FROM products`
+      ).first(),
+      env.DB.prepare(
+        `SELECT products.business_id, businesses.name AS business_name, users.username,
+          products.code, products.barcode, products.name, products.category, products.price, products.stock
+         FROM products
+         JOIN businesses ON businesses.id = products.business_id
+         JOIN users ON users.business_id = businesses.id
+         ${where}
+         ORDER BY businesses.name, products.name
+         LIMIT 50 OFFSET ?`
+      ).bind(...bindings, offset).all(),
+    ]);
+    return json({
+      items: (result.results || []).map((row) => ({
+        businessId: row.business_id,
+        businessName: row.business_name,
+        username: row.username,
+        code: row.code,
+        barcode: row.barcode,
+        name: row.name,
+        category: row.category,
+        price: Number(row.price),
+        stock: Number(row.stock),
+      })),
+      total: Number(count?.total) || 0,
+      offset,
+      limit: 50,
+      summary: { total: Number(summary?.total) || 0, lowStock: Number(summary?.lowStock) || 0 },
+    });
+  }
+
+  if (resource === "products" && ["POST", "PATCH"].includes(request.method)) {
+    const body = await parseJsonBody(request);
+    const businessId = typeof body?.businessId === "string" ? body.businessId : "";
+    const code = typeof body?.code === "string" ? body.code.trim() : "";
+    const name = typeof body?.name === "string" ? body.name.trim() : "";
+    const barcode = typeof body?.barcode === "string" ? body.barcode.trim() : "";
+    const category = typeof body?.category === "string" ? body.category.trim() : "";
+    const price = Number(body?.price);
+    const stock = Number(body?.stock);
+    const hasImage = Object.hasOwn(body || {}, "image");
+    const image = hasImage ? body.image : "";
+    if (
+      !/^[\w-]{1,128}$/.test(businessId)
+      || (request.method === "PATCH" && (!code || code.length > 128))
+      || !name || name.length > 160
+      || !barcode || barcode.length > 128
+      || !category || category.length > 80
+      || !Number.isSafeInteger(price) || price <= 0
+      || !Number.isSafeInteger(stock) || stock < 0
+    ) {
+      return json({ error: "Data produk tidak valid." }, 400);
+    }
+    if (hasImage && !validProductImage(image)) {
+      return json({ error: "Foto produk tidak valid atau terlalu besar." }, 400);
+    }
+    const business = await env.DB.prepare(
+      "SELECT id FROM businesses WHERE id = ?"
+    ).bind(businessId).first();
+    if (!business) return json({ error: "Usaha tidak ditemukan." }, 404);
+
+    const duplicate = await env.DB.prepare(
+      "SELECT code FROM products WHERE business_id = ? AND barcode = ? AND code != ?"
+    ).bind(businessId, barcode, request.method === "PATCH" ? code : "").first();
+    if (duplicate) return json({ error: "Barcode sudah digunakan produk lain pada usaha ini." }, 409);
+
+    if (request.method === "POST") {
+      const next = await env.DB.prepare(
+        "SELECT COALESCE(MAX(CAST(id AS INTEGER)), 0) + 1 AS number FROM products WHERE business_id = ?"
+      ).bind(businessId).first();
+      const id = String(next.number);
+      const newCode = `K${String(next.number).padStart(2, "0")}`;
+      await env.DB.prepare(
+        "INSERT INTO products (id, business_id, code, barcode, name, category, price, stock, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).bind(id, businessId, newCode, barcode, name, category, price, stock, image || "").run();
+      return json({ success: true, code: newCode }, 201);
+    }
+
+    const result = await env.DB.prepare(
+      `UPDATE products SET barcode = ?, name = ?, category = ?, price = ?, stock = ?,
+        image = CASE WHEN ? = 1 THEN ? ELSE image END
+       WHERE business_id = ? AND code = ?`
+    ).bind(barcode, name, category, price, stock, hasImage ? 1 : 0, image || "", businessId, code).run();
+    if (!result.meta.changes) return json({ error: "Produk tidak ditemukan." }, 404);
+    return json({ success: true });
+  }
+
+  if (resource === "transactions" && request.method === "GET") {
+    const where = search
+      ? "WHERE instr(lower(transactions.id), lower(?)) > 0 OR instr(lower(businesses.name), lower(?)) > 0 OR instr(lower(users.username), lower(?)) > 0"
+      : "";
+    const bindings = search ? [search, search, search] : [];
+    const [count, summary, result] = await Promise.all([
+      env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM transactions
+         JOIN businesses ON businesses.id = transactions.business_id
+         JOIN users ON users.business_id = businesses.id
+         ${where}`
+      ).bind(...bindings).first(),
+      env.DB.prepare(
+        "SELECT COUNT(*) AS total, COALESCE(SUM(total), 0) AS sales FROM transactions"
+      ).first(),
+      env.DB.prepare(
+        `SELECT transactions.id, transactions.business_id, transactions.waktu, transactions.total,
+          transactions.payment_method, businesses.name AS business_name, users.username,
+          (SELECT COUNT(*) FROM transaction_items WHERE transaction_items.transaction_id = transactions.id) AS item_count
+         FROM transactions
+         JOIN businesses ON businesses.id = transactions.business_id
+         JOIN users ON users.business_id = businesses.id
+         ${where}
+         ORDER BY transactions.waktu DESC, transactions.id DESC
+         LIMIT 50 OFFSET ?`
+      ).bind(...bindings, offset).all(),
+    ]);
+    return json({
+      items: (result.results || []).map((row) => ({
+        id: row.id,
+        businessId: row.business_id,
+        businessName: row.business_name,
+        username: row.username,
+        time: row.waktu,
+        total: Number(row.total),
+        paymentMethod: row.payment_method || "tunai",
+        itemCount: Number(row.item_count) || 0,
+      })),
+      total: Number(count?.total) || 0,
+      offset,
+      limit: 50,
+      summary: { count: Number(summary?.total) || 0, sales: Number(summary?.sales) || 0 },
+    });
+  }
+
+  if (resource === "transaction" && request.method === "GET") {
+    const id = url.searchParams.get("id") || "";
+    if (!id || id.length > 128) return json({ error: "Transaksi yang dipilih tidak valid." }, 400);
+    const transaction = await env.DB.prepare(
+      `SELECT transactions.id, transactions.business_id, transactions.waktu, transactions.subtotal,
+        transactions.diskon, transactions.ppn, transactions.total, transactions.dibayar,
+        transactions.kembalian, transactions.member, transactions.payment_method,
+        businesses.name AS business_name, users.username
+       FROM transactions
+       JOIN businesses ON businesses.id = transactions.business_id
+       JOIN users ON users.business_id = businesses.id
+       WHERE transactions.id = ?`
+    ).bind(id).first();
+    if (!transaction) return json({ error: "Transaksi tidak ditemukan." }, 404);
+    const items = await env.DB.prepare(
+      "SELECT product_code AS code, name, price, qty FROM transaction_items WHERE transaction_id = ? ORDER BY rowid"
+    ).bind(id).all();
+    return json({
+      ...transaction,
+      subtotal: Number(transaction.subtotal),
+      diskon: Number(transaction.diskon),
+      ppn: Number(transaction.ppn),
+      total: Number(transaction.total),
+      dibayar: Number(transaction.dibayar),
+      kembalian: Number(transaction.kembalian),
+      member: Boolean(transaction.member),
+      paymentMethod: transaction.payment_method || "tunai",
+      items: (items.results || []).map((item) => ({
+        code: item.code,
+        name: item.name,
+        price: Number(item.price),
+        qty: Number(item.qty),
+      })),
+    });
+  }
+
+  if (resource === "payments" && request.method === "GET") {
+    const where = search
+      ? "WHERE instr(lower(businesses.name), lower(?)) > 0 OR instr(lower(users.username), lower(?)) > 0"
+      : "";
+    const bindings = search ? [search, search] : [];
+    const [count, result] = await Promise.all([
+      env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM businesses JOIN users ON users.business_id = businesses.id
+         ${where}`
+      ).bind(...bindings).first(),
+      env.DB.prepare(
+        `SELECT businesses.id AS business_id, businesses.name AS business_name, users.username,
+          COALESCE(settings.qris_enabled, 0) AS qris_enabled,
+          CASE WHEN COALESCE(settings.qris_image, '') <> '' THEN 1 ELSE 0 END AS has_image,
+          settings.updated_at
+         FROM businesses
+         JOIN users ON users.business_id = businesses.id
+         LEFT JOIN business_payment_settings AS settings ON settings.business_id = businesses.id
+         ${where}
+         ORDER BY businesses.name
+         LIMIT 50 OFFSET ?`
+      ).bind(...bindings, offset).all(),
+    ]);
+    return json({
+      items: (result.results || []).map((row) => ({
+        businessId: row.business_id,
+        businessName: row.business_name,
+        username: row.username,
+        qrisEnabled: Boolean(row.qris_enabled),
+        hasImage: Boolean(row.has_image),
+        updatedAt: row.updated_at || "",
+      })),
+      total: Number(count?.total) || 0,
+      offset,
+      limit: 50,
+    });
+  }
+
+  if (resource === "payment" && request.method === "GET") {
+    const businessId = url.searchParams.get("businessId") || "";
+    const settings = await env.DB.prepare(
+      `SELECT businesses.id AS business_id, businesses.name AS business_name,
+        COALESCE(settings.qris_enabled, 0) AS qris_enabled, COALESCE(settings.qris_image, '') AS qris_image
+       FROM businesses
+       LEFT JOIN business_payment_settings AS settings ON settings.business_id = businesses.id
+       WHERE businesses.id = ?`
+    ).bind(businessId).first();
+    if (!settings) return json({ error: "Usaha tidak ditemukan." }, 404);
+    return json({
+      businessId: settings.business_id,
+      businessName: settings.business_name,
+      qrisEnabled: Boolean(settings.qris_enabled),
+      qrisImage: settings.qris_image,
+    });
+  }
+
+  if (resource === "payments" && request.method === "PATCH") {
+    const body = await parseJsonBody(request);
+    const businessId = typeof body?.businessId === "string" ? body.businessId : "";
+    if (!/^[\w-]{1,128}$/.test(businessId) || typeof body?.qrisEnabled !== "boolean") {
+      return json({ error: "Pengaturan QR pembayaran tidak valid." }, 400);
+    }
+    const business = await env.DB.prepare(
+      "SELECT id FROM businesses WHERE id = ?"
+    ).bind(businessId).first();
+    if (!business) return json({ error: "Usaha tidak ditemukan." }, 404);
+    const settings = await env.DB.prepare(
+      "SELECT qris_image FROM business_payment_settings WHERE business_id = ?"
+    ).bind(businessId).first();
+    if (body.qrisEnabled && !settings?.qris_image) {
+      return json({ error: "QR usaha belum tersedia; pemilik usaha perlu mengunggahnya terlebih dahulu." }, 400);
+    }
+    await env.DB.prepare(
+      `INSERT INTO business_payment_settings (business_id, qris_enabled, qris_image)
+       VALUES (?, ?, '')
+       ON CONFLICT(business_id) DO UPDATE SET qris_enabled = excluded.qris_enabled, updated_at = CURRENT_TIMESTAMP`
+    ).bind(businessId, body.qrisEnabled ? 1 : 0).run();
+    return json({ success: true, qrisEnabled: body.qrisEnabled });
+  }
+
+  if (resource === "alerts" && request.method === "GET") {
+    const where = search
+      ? "WHERE instr(lower(store_alerts.title), lower(?)) > 0 OR instr(lower(store_alerts.message), lower(?)) > 0 OR instr(lower(businesses.name), lower(?)) > 0"
+      : "";
+    const bindings = search ? [search, search, search] : [];
+    const [count, result] = await Promise.all([
+      env.DB.prepare(
+        `SELECT COUNT(*) AS total
+         FROM store_alerts JOIN businesses ON businesses.id = store_alerts.business_id
+         ${where}`
+      ).bind(...bindings).first(),
+      env.DB.prepare(
+        `SELECT store_alerts.id, store_alerts.business_id, businesses.name AS business_name,
+          store_alerts.category, store_alerts.priority, store_alerts.title, store_alerts.message,
+          store_alerts.status, store_alerts.created_at, store_alerts.updated_at
+         FROM store_alerts JOIN businesses ON businesses.id = store_alerts.business_id
+         ${where}
+         ORDER BY CASE store_alerts.priority WHEN 'tinggi' THEN 0 WHEN 'sedang' THEN 1 ELSE 2 END,
+          store_alerts.created_at DESC
+         LIMIT 50 OFFSET ?`
+      ).bind(...bindings, offset).all(),
+    ]);
+    return json({
+      items: (result.results || []).map((row) => ({
+        id: row.id,
+        businessId: row.business_id,
+        businessName: row.business_name,
+        category: row.category,
+        priority: row.priority,
+        title: row.title,
+        message: row.message,
+        status: row.status,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
+      total: Number(count?.total) || 0,
+      offset,
+      limit: 50,
+    });
+  }
+
+  if (resource === "alerts" && request.method === "PATCH") {
+    const body = await parseJsonBody(request);
+    const id = typeof body?.id === "string" ? body.id : "";
+    const businessId = typeof body?.businessId === "string" ? body.businessId : "";
+    const status = body?.status;
+    if (!id || id.length > 128 || !/^[\w-]{1,128}$/.test(businessId)
+      || !["dibaca", "ditangani", "selesai", "tidak_relevan"].includes(status)) {
+      return json({ error: "Perubahan status perhatian tidak valid." }, 400);
+    }
+    const result = await env.DB.prepare(
+      `UPDATE store_alerts SET status = ?,
+        read_at = CASE WHEN ? IN ('dibaca','ditangani','selesai') THEN COALESCE(read_at,CURRENT_TIMESTAMP) ELSE read_at END,
+        resolved_at = CASE WHEN ? IN ('selesai','tidak_relevan') THEN CURRENT_TIMESTAMP ELSE NULL END,
+        updated_at = CURRENT_TIMESTAMP
+       WHERE business_id = ? AND id = ?`
+    ).bind(status, status, status, businessId, id).run();
+    if (!result.meta.changes) return json({ error: "Perhatian tidak ditemukan." }, 404);
+    return json({ success: true });
+  }
+
+  return json({ error: "Data admin tidak ditemukan." }, 404);
 }
 
 function validProductImage(image) {
@@ -1401,6 +1755,10 @@ export default {
         if (url.pathname === "/api/admin/accounts") {
           if (!isAdminUser(user, env)) return json({ error: "Akses admin tidak diizinkan." }, 403);
           return await adminAccountsApi(request, env, user);
+        }
+        if (url.pathname === "/api/admin/data") {
+          if (!isAdminUser(user, env)) return json({ error: "Akses admin tidak diizinkan." }, 403);
+          return await adminDataApi(request, env);
         }
         if (url.pathname === "/api/products" || url.pathname.startsWith("/api/products/")) {
           return await productsApi(request, env, url.pathname, user.business_id);

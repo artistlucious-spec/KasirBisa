@@ -30,8 +30,8 @@
   <main class="admin-main">
     <section class="admin-heading">
       <p class="eyebrow">PENGELOLA APLIKASI</p>
-      <h1>Kelola akun usaha</h1>
-      <p>Lihat ringkasan akun dan aktifkan atau nonaktifkan akses. Data password dan rincian transaksi tidak ditampilkan.</p>
+      <h1>Panel pengelolaan</h1>
+      <p>Kelola akun dan data usaha pengguna. Transaksi hanya dapat dilihat; penghapusan permanen tidak tersedia. Password tidak pernah ditampilkan.</p>
     </section>
 
     <p id="admin-status" class="notice" role="status" aria-live="polite">Memeriksa akses admin...</p>
@@ -43,11 +43,19 @@
         <article class="admin-summary-card"><span>Akun nonaktif</span><strong id="jumlah-nonaktif">0</strong></article>
       </div>
 
-      <section class="admin-panel" aria-labelledby="admin-accounts-title">
+      <nav class="admin-tabs" aria-label="Bagian panel admin">
+        <button class="active" type="button" data-admin-tab="accounts" aria-selected="true">Akun &amp; usaha</button>
+        <button type="button" data-admin-tab="products" aria-selected="false">Produk &amp; stok</button>
+        <button type="button" data-admin-tab="transactions" aria-selected="false">Transaksi</button>
+        <button type="button" data-admin-tab="payments" aria-selected="false">Pembayaran &amp; QR</button>
+        <button type="button" data-admin-tab="alerts" aria-selected="false">Pusat perhatian</button>
+      </nav>
+
+      <section class="admin-panel admin-tab-panel" data-admin-panel="accounts" aria-labelledby="admin-accounts-title">
         <div class="admin-panel-heading">
           <div>
             <h2 id="admin-accounts-title">Daftar akun</h2>
-            <p>Gunakan nama usaha atau nama pengguna untuk mencari akun.</p>
+            <p>Lihat identitas dan ringkasan usaha, tambah produk untuk usaha, atau ubah akses akun. Akun admin utama dilindungi.</p>
           </div>
           <button id="admin-refresh" class="secondary-button admin-refresh" type="button">Muat ulang</button>
         </div>
@@ -60,6 +68,7 @@
               <tr>
                 <th scope="col">Usaha</th>
                 <th scope="col">Nama pengguna</th>
+                <th scope="col">WhatsApp</th>
                 <th scope="col">Bergabung</th>
                 <th scope="col">Produk / transaksi</th>
                 <th scope="col">Status</th>
@@ -67,15 +76,127 @@
               </tr>
             </thead>
             <tbody id="admin-account-list">
-              <tr><td class="admin-empty" colspan="6">Memuat akun...</td></tr>
+              <tr><td class="admin-empty" colspan="7">Memuat akun...</td></tr>
             </tbody>
           </table>
         </div>
         <p id="admin-result-count" class="admin-result-count"></p>
         <button id="admin-load-more" class="secondary-button admin-load-more" type="button" hidden>Muat akun berikutnya</button>
       </section>
+
+      <section class="admin-panel admin-tab-panel" data-admin-panel="products" aria-labelledby="admin-products-title" hidden>
+        <div class="admin-panel-heading">
+          <div>
+            <h2 id="admin-products-title">Produk &amp; stok seluruh usaha</h2>
+            <p>Perbarui nama, harga, kategori, barcode, atau stok. Produk tidak dapat dihapus dari panel ini.</p>
+          </div>
+          <button id="admin-products-refresh" class="secondary-button admin-refresh" type="button">Muat ulang</button>
+        </div>
+        <div class="admin-inline-summary"><span>Total produk: <strong id="admin-product-total">-</strong></span><span>Stok rendah (≤ 5): <strong id="admin-low-stock">-</strong></span></div>
+        <label class="admin-search-label" for="admin-products-search">Cari produk atau usaha
+          <input id="admin-products-search" type="search" maxlength="100" placeholder="Nama produk, kode, barcode, atau usaha">
+        </label>
+        <div class="admin-table-scroll">
+          <table class="admin-table">
+            <thead><tr><th scope="col">Usaha</th><th scope="col">Produk</th><th scope="col">Kode / barcode</th><th scope="col">Kategori</th><th scope="col">Harga</th><th scope="col">Stok</th><th scope="col">Aksi</th></tr></thead>
+            <tbody id="admin-product-list"><tr><td class="admin-empty" colspan="7">Pilih bagian ini untuk memuat produk.</td></tr></tbody>
+          </table>
+        </div>
+        <p id="admin-products-count" class="admin-result-count"></p>
+        <button id="admin-products-more" class="secondary-button admin-load-more" type="button" hidden>Muat produk berikutnya</button>
+      </section>
+
+      <section class="admin-panel admin-tab-panel" data-admin-panel="transactions" aria-labelledby="admin-transactions-title" hidden>
+        <div class="admin-panel-heading">
+          <div>
+            <h2 id="admin-transactions-title">Riwayat transaksi seluruh usaha</h2>
+            <p>Data hanya untuk pemeriksaan. Panel ini tidak mengubah atau menghapus transaksi.</p>
+          </div>
+          <button id="admin-transactions-refresh" class="secondary-button admin-refresh" type="button">Muat ulang</button>
+        </div>
+        <div class="admin-inline-summary"><span>Jumlah transaksi: <strong id="admin-transaction-total">-</strong></span><span>Total penjualan tercatat: <strong id="admin-sales-total">-</strong></span></div>
+        <label class="admin-search-label" for="admin-transactions-search">Cari transaksi atau usaha
+          <input id="admin-transactions-search" type="search" maxlength="100" placeholder="ID transaksi, nama usaha, atau pengguna">
+        </label>
+        <div class="admin-table-scroll">
+          <table class="admin-table">
+            <thead><tr><th scope="col">Waktu</th><th scope="col">Usaha</th><th scope="col">ID transaksi</th><th scope="col">Item</th><th scope="col">Metode</th><th scope="col">Total</th><th scope="col">Rincian</th></tr></thead>
+            <tbody id="admin-transaction-list"><tr><td class="admin-empty" colspan="7">Pilih bagian ini untuk memuat transaksi.</td></tr></tbody>
+          </table>
+        </div>
+        <p id="admin-transactions-count" class="admin-result-count"></p>
+        <button id="admin-transactions-more" class="secondary-button admin-load-more" type="button" hidden>Muat transaksi berikutnya</button>
+      </section>
+
+      <section class="admin-panel admin-tab-panel" data-admin-panel="payments" aria-labelledby="admin-payments-title" hidden>
+        <div class="admin-panel-heading">
+          <div>
+            <h2 id="admin-payments-title">Pembayaran &amp; QR</h2>
+            <p>Lihat QR yang disimpan dan aktifkan/nonaktifkan penerimaan QRIS. QR tidak diubah atau dihapus di sini.</p>
+          </div>
+          <button id="admin-payments-refresh" class="secondary-button admin-refresh" type="button">Muat ulang</button>
+        </div>
+        <label class="admin-search-label" for="admin-payments-search">Cari usaha
+          <input id="admin-payments-search" type="search" maxlength="100" placeholder="Nama usaha atau pengguna">
+        </label>
+        <div class="admin-table-scroll">
+          <table class="admin-table">
+            <thead><tr><th scope="col">Usaha</th><th scope="col">Nama pengguna</th><th scope="col">QR tersimpan</th><th scope="col">QRIS</th><th scope="col">Aksi</th></tr></thead>
+            <tbody id="admin-payment-list"><tr><td class="admin-empty" colspan="5">Pilih bagian ini untuk memuat pengaturan pembayaran.</td></tr></tbody>
+          </table>
+        </div>
+        <p id="admin-payments-count" class="admin-result-count"></p>
+        <button id="admin-payments-more" class="secondary-button admin-load-more" type="button" hidden>Muat usaha berikutnya</button>
+      </section>
+
+      <section class="admin-panel admin-tab-panel" data-admin-panel="alerts" aria-labelledby="admin-alerts-title" hidden>
+        <div class="admin-panel-heading">
+          <div>
+            <h2 id="admin-alerts-title">Pusat Perhatian seluruh usaha</h2>
+            <p>Lihat notifikasi kondisi usaha dan tandai selesai atau tidak relevan.</p>
+          </div>
+          <button id="admin-alerts-refresh" class="secondary-button admin-refresh" type="button">Muat ulang</button>
+        </div>
+        <label class="admin-search-label" for="admin-alerts-search">Cari perhatian atau usaha
+          <input id="admin-alerts-search" type="search" maxlength="100" placeholder="Judul, isi, atau nama usaha">
+        </label>
+        <div class="admin-table-scroll">
+          <table class="admin-table">
+            <thead><tr><th scope="col">Prioritas</th><th scope="col">Usaha</th><th scope="col">Perhatian</th><th scope="col">Status</th><th scope="col">Tanggal</th><th scope="col">Aksi</th></tr></thead>
+            <tbody id="admin-alert-list"><tr><td class="admin-empty" colspan="6">Pilih bagian ini untuk memuat perhatian.</td></tr></tbody>
+          </table>
+        </div>
+        <p id="admin-alerts-count" class="admin-result-count"></p>
+        <button id="admin-alerts-more" class="secondary-button admin-load-more" type="button" hidden>Muat perhatian berikutnya</button>
+      </section>
     </section>
   </main>
+
+  <dialog id="admin-product-dialog" class="admin-dialog">
+    <form id="admin-product-form">
+      <div class="admin-dialog-heading"><div><p class="eyebrow">DATA PRODUK</p><h2 id="admin-product-dialog-title">Ubah produk dan stok</h2></div><button class="text-button" type="button" data-dialog-close aria-label="Tutup">Tutup</button></div>
+      <p id="admin-product-business" class="muted"></p>
+      <input id="admin-product-business-id" type="hidden">
+      <input id="admin-product-code" type="hidden">
+      <label>Nama produk<input id="admin-product-name" maxlength="160" required></label>
+      <label>Barcode<input id="admin-product-barcode" maxlength="128" required></label>
+      <label>Kategori<input id="admin-product-category" maxlength="80" required></label>
+      <label>Harga<input id="admin-product-price" type="number" min="1" step="1" required></label>
+      <label>Stok<input id="admin-product-stock" type="number" min="0" step="1" required></label>
+      <p id="admin-product-error" class="notice" role="status"></p>
+      <div class="admin-dialog-actions"><button class="secondary-button" type="button" data-dialog-close>Batal</button><button id="admin-product-save" class="primary-button" type="submit">Simpan perubahan</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="admin-transaction-dialog" class="admin-dialog admin-detail-dialog">
+    <div class="admin-dialog-heading"><div><p class="eyebrow">RINCIAN TRANSAKSI</p><h2 id="admin-transaction-heading">Transaksi</h2></div><button class="text-button" type="button" data-dialog-close aria-label="Tutup">Tutup</button></div>
+    <div id="admin-transaction-detail"></div>
+  </dialog>
+
+  <dialog id="admin-qr-dialog" class="admin-dialog admin-qr-dialog">
+    <div class="admin-dialog-heading"><div><p class="eyebrow">QR PEMBAYARAN</p><h2 id="admin-qr-heading">QR Usaha</h2></div><button class="text-button" type="button" data-dialog-close aria-label="Tutup">Tutup</button></div>
+    <div id="admin-qr-content"></div>
+  </dialog>
 
   <script src="scripts/navigation.js"></script>
   <script src="scripts/admin.js"></script>
