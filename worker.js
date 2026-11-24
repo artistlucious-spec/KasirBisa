@@ -358,7 +358,7 @@ async function authApi(request, env, pathname) {
     const user = await getSessionUser(request, env);
     return json({
       authenticated: Boolean(user),
-      ...(user ? { username: user.username, businessName: user.business_name } : {}),
+      ...(user ? { username: user.username, businessName: user.business_name, profileImage: user.profile_image || "" } : {}),
     });
   }
 
@@ -392,12 +392,17 @@ async function authApi(request, env, pathname) {
     const body = await parseJsonBody(request);
     if (!body) return json({ error: "Data profil tidak valid." }, 400);
     const username = typeof body.username === "string" ? body.username.trim() : "";
+    const hasBusinessName = Object.hasOwn(body, "businessName");
+    const businessName = hasBusinessName && typeof body.businessName === "string" ? body.businessName.trim() : "";
     const currentPassword = typeof body.currentPassword === "string" ? body.currentPassword : "";
     const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
     const hasImage = Object.hasOwn(body, "profileImage");
     const profileImage = hasImage ? body.profileImage : null;
     if (!username || username.length > 128 || currentPassword.length > 256) {
       return json({ error: "Nama pengguna atau password tidak valid." }, 400);
+    }
+    if (hasBusinessName && (!businessName || businessName.length > 120)) {
+      return json({ error: "Nama toko wajib diisi dan maksimal 120 karakter." }, 400);
     }
     if (newPassword && (newPassword.length < 12 || newPassword.length > 256)) {
       return json({ error: "Password baru harus berisi 12 sampai 256 karakter." }, 400);
@@ -411,7 +416,8 @@ async function authApi(request, env, pathname) {
     if (newPassword && !await verifyPassword(currentPassword, user)) {
       return json({ error: "Password saat ini salah." }, 401);
     }
-    if (!hasImage && !newPassword && username === user.username) {
+    const businessNameChanged = hasBusinessName && businessName !== user.business_name;
+    if (!hasImage && !newPassword && username === user.username && !businessNameChanged) {
       return json({ error: "Tidak ada perubahan untuk disimpan." }, 400);
     }
     const duplicate = await env.DB.prepare(
@@ -442,6 +448,12 @@ async function authApi(request, env, pathname) {
       user.id
     ).run();
     if (!result.meta.changes) return json({ error: "Profil tidak ditemukan." }, 404);
+    if (businessNameChanged) {
+      const businessResult = await env.DB.prepare(
+        "UPDATE businesses SET name = ? WHERE id = ?"
+      ).bind(businessName, user.business_id).run();
+      if (!businessResult.meta.changes) return json({ error: "Data toko tidak ditemukan." }, 404);
+    }
 
     const headers = credentialsChanged
       ? cookieHeaders(request, await createSessionToken(env.AUTH_SESSION_SECRET, user.id, sessionVersion), AUTH_SESSION_SECONDS)
@@ -450,6 +462,7 @@ async function authApi(request, env, pathname) {
       success: true,
       profile: {
         username,
+        businessName: hasBusinessName ? businessName : user.business_name,
         profileImage: hasImage ? profileImage : user.profile_image,
       },
     }, 200, headers);
@@ -472,6 +485,20 @@ function parseGeminiJson(text) {
   } catch {
     return null;
   }
+}
+
+function getGeminiModel(env) {
+  const configured = typeof env.GEMINI_MODEL === "string" ? env.GEMINI_MODEL.trim() : "";
+  // Abaikan nilai contoh/placeholder agar tidak dikirim sebagai nama model ke Google.
+  if (!configured || /^(MODEL_|ISI_|GANTI_|NAMA_MODEL)/i.test(configured) || /[\s<>]/.test(configured)) {
+    return "gemini-3.8-flash";
+  }
+  return configured.replace(/^models\//, "");
+}
+
+function extractGeminiError(data, rawText, status) {
+  const message = data?.error?.message || data?.message || rawText || geminiErrorMessage(status);
+  return String(message).slice(0, 1200);
 }
 
 function geminiErrorMessage(status) {
@@ -681,120 +708,506 @@ async function transactionsApi(request, env, businessId) {
   }, 201);
 }
 
-async function smartInsightApi(env, businessId) {
-  // Fakta dihitung dari database usaha ini; model AI hanya menerima ringkasan agregat.
-  const transactions = await env.DB.prepare(
-    "SELECT id, waktu, subtotal, diskon, ppn, total, dibayar, kembalian, member FROM transactions WHERE business_id = ? ORDER BY waktu DESC"
-  ).bind(businessId).all();
-  const products = await env.DB.prepare(
-    "SELECT code, name, category, price, stock FROM products WHERE business_id = ? ORDER BY name"
-  ).bind(businessId).all();
-  const productMap = new Map((products.results || []).map((item) => [item.code, item]));
-  const counts = new Map();
-  const hours = new Map();
-  let totalSales = 0;
+function insightRecommendation(priority, category, title, evidence, action, reason) {
+  return { priority, category, title, evidence, action, reason };
+}
 
-  for (const transaction of transactions.results || []) {
-    totalSales += Number(transaction.total || 0);
-    const date = new Date(transaction.waktu);
-    if (!Number.isNaN(date.getTime())) {
-      const hour = date.getHours();
-      hours.set(hour, (hours.get(hour) || 0) + 1);
+function buildInsightRecommendations(facts, focus) {
+  const recommendations = [];
+  const add = (item) => recommendations.push(item);
+  const stockRisks = facts.risiko_stok || [];
+  for (const item of stockRisks.slice(0, 4)) {
+    add(insightRecommendation(
+      item.hari_tersisa !== null && item.hari_tersisa <= 3 ? "tinggi" : "sedang",
+      "stok",
+      item.stok === 0 ? `Stok ${item.nama} sudah habis` : `Periksa stok ${item.nama}`,
+      `${item.terjual_7_hari} unit terjual dalam 7 hari; stok saat ini ${item.stok}${item.hari_tersisa !== null ? `, perkiraan cukup ${item.hari_tersisa} hari` : ""}.`,
+      item.stok === 0 ? `Periksa kebutuhan dan lakukan restok ${item.nama} jika produk masih ingin dijual.` : `Periksa stok fisik dan pertimbangkan restok ${item.nama} sebelum persediaan habis.`,
+      "Rekomendasi dihitung dari laju penjualan terbaru dan stok yang tercatat."
+    ));
+  }
+
+  if (facts.tren_penjualan.status === "naik") {
+    add(insightRecommendation("sedang", "penjualan", "Penjualan sedang meningkat", facts.tren_penjualan.keterangan,
+      "Pastikan produk yang paling banyak dicari tetap tersedia dan pertimbangkan menambah penempatan produk tersebut.",
+      "Kenaikan penjualan perlu diikuti kesiapan stok agar peluang tidak terlewat."));
+  } else if (facts.tren_penjualan.status === "turun") {
+    add(insightRecommendation("sedang", "penjualan", "Penjualan lebih rendah dari pekan sebelumnya", facts.tren_penjualan.keterangan,
+      "Periksa apakah produk utama sering kosong, jam buka berubah, atau pelanggan membutuhkan pilihan produk lain sebelum membuat promo.",
+      "Periksa penyebab terlebih dahulu agar tindakan yang dipilih sesuai kondisi toko."));
+  }
+
+  if (facts.produk_terlaris_7_hari.length) {
+    const top = facts.produk_terlaris_7_hari[0];
+    add(insightRecommendation("informasi", "produk", `Pertahankan ketersediaan ${top.nama}`,
+      `${top.qty} unit terjual dalam 7 hari terakhir.`,
+      `Pastikan ${top.nama} mudah ditemukan dan stoknya dipantau setiap hari.`,
+      "Produk dengan penjualan tertinggi layak dipantau agar tidak kehilangan momentum."));
+  }
+  const pair = (facts.kombinasi_produk || []).find((item) => item.transaksi_bersama >= 2);
+  if (pair) {
+    add(insightRecommendation("informasi", "penjualan", "Dua produk sering dibeli bersama",
+      `${pair.produk[0]} dan ${pair.produk[1]} muncul bersama dalam ${pair.transaksi_bersama} transaksi selama 30 hari terakhir.`,
+      "Pertimbangkan menempatkan kedua produk berdekatan agar pelanggan mudah menemukannya. Tidak perlu memberi diskon sebelum mengetahui margin masing-masing produk.",
+      "Pola ini berasal dari kombinasi item dalam transaksi yang tersimpan."));
+  }
+
+  for (const item of (facts.produk_tidak_bergerak || []).slice(0, 3)) {
+    add(insightRecommendation("sedang", "produk_lambat", `Evaluasi ${item.nama} yang belum terjual`,
+      `Stok tercatat ${item.stok} unit dan tidak ada penjualan produk ini dalam 30 hari terakhir.`,
+      `Periksa kondisi, penempatan, dan kebutuhan pelanggan sebelum memutuskan membeli stok tambahan ${item.nama}. Jika produk baru ditambahkan, kumpulkan data lebih lama sebelum mengambil keputusan.`,
+      "Tanggal produk ditambahkan belum tersedia, jadi sistem tidak dapat membedakan produk baru dari stok lama."));
+  }
+
+  if (!facts.jumlah_transaksi) {
+    add(insightRecommendation("informasi", "data", "Mulai catat transaksi harian",
+      "Belum ada transaksi yang tercatat pada usaha ini.",
+      "Gunakan halaman Kasir untuk mencatat transaksi. Setelah data terkumpul, Smart Insight dapat membaca pola penjualan dan stok.",
+      "Analisis belum dapat dibuat tanpa data transaksi."));
+  }
+
+  const priorityOrder = { tinggi: 0, sedang: 1, informasi: 2 };
+  const focusOrder = {
+    automatic: [],
+    sales: ["penjualan", "produk", "stok", "produk_lambat"],
+    stock: ["stok", "produk", "produk_lambat", "penjualan"],
+    best_sellers: ["produk", "stok", "penjualan", "produk_lambat"],
+    slow_movers: ["produk_lambat", "stok", "penjualan", "produk"],
+    hours: ["waktu", "penjualan", "produk", "stok"],
+  }[focus] || [];
+  recommendations.sort((a, b) => {
+    const pa = priorityOrder[a.priority] ?? 3;
+    const pb = priorityOrder[b.priority] ?? 3;
+    if (pa !== pb) return pa - pb;
+    const fa = focusOrder.indexOf(a.category);
+    const fb = focusOrder.indexOf(b.category);
+    return (fa < 0 ? 99 : fa) - (fb < 0 ? 99 : fb);
+  });
+  return recommendations.slice(0, 8);
+}
+
+async function smartInsightApi(request, env, businessId) {
+  // Satu JOIN mengambil transaksi dan item sekaligus; seluruh data dibatasi pada business_id sesi.
+  const body = await parseJsonBody(request) || {};
+  const allowedFocus = new Set(["automatic", "sales", "stock", "best_sellers", "slow_movers", "hours"]);
+  const focus = allowedFocus.has(body.focus) ? body.focus : "automatic";
+  const [transactionRows, productsResult] = await Promise.all([
+    env.DB.prepare(`
+      SELECT t.id, t.waktu, t.subtotal, t.total, ti.product_code, ti.name AS item_name, ti.qty
+      FROM transactions t
+      LEFT JOIN transaction_items ti ON ti.transaction_id = t.id
+      WHERE t.business_id = ?
+      ORDER BY t.waktu DESC
+    `).bind(businessId).all(),
+    env.DB.prepare("SELECT code, name, category, price, stock FROM products WHERE business_id = ? ORDER BY name")
+      .bind(businessId).all(),
+  ]);
+  const products = productsResult.results || [];
+  const productMap = new Map(products.map((item) => [item.code, item]));
+  const txMap = new Map();
+  const productStats = new Map();
+  const pairCounts = new Map();
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const current7 = now - 7 * dayMs;
+  const previous7 = now - 14 * dayMs;
+  const current30 = now - 30 * dayMs;
+  let totalAll = 0;
+  let oldestTransactionTimestamp = Infinity;
+  let total7 = 0;
+  let totalPrevious7 = 0;
+  let count7 = 0;
+  let countPrevious7 = 0;
+  let count30 = 0;
+
+  for (const row of transactionRows.results || []) {
+    let tx = txMap.get(row.id);
+    if (!tx) {
+      const timestamp = Date.parse(row.waktu);
+      tx = { id: row.id, timestamp, waktu: row.waktu, total: Number(row.total || 0), items: [] };
+      txMap.set(row.id, tx);
+      totalAll += tx.total;
+      if (Number.isFinite(timestamp)) {
+        oldestTransactionTimestamp = Math.min(oldestTransactionTimestamp, timestamp);
+        if (timestamp >= current7) { total7 += tx.total; count7 += 1; }
+        else if (timestamp >= previous7 && timestamp < current7) { totalPrevious7 += tx.total; countPrevious7 += 1; }
+        if (timestamp >= current30) count30 += 1;
+      }
     }
-    const items = await env.DB.prepare(
-      "SELECT product_code, qty FROM transaction_items WHERE transaction_id = ?"
-    ).bind(transaction.id).all();
-    for (const item of items.results || []) {
-      counts.set(item.product_code, (counts.get(item.product_code) || 0) + Number(item.qty || 0));
+    if (row.product_code && row.qty !== null) {
+      const qty = Number(row.qty || 0);
+      tx.items.push({ code: row.product_code, name: row.item_name, qty });
+      const stat = productStats.get(row.product_code) || { code: row.product_code, name: row.item_name, all: 0, seven: 0, thirty: 0 };
+      stat.all += qty;
+      if (Number.isFinite(tx.timestamp)) {
+        if (tx.timestamp >= current7) stat.seven += qty;
+        if (tx.timestamp >= current30) stat.thirty += qty;
+      }
+      productStats.set(row.product_code, stat);
     }
   }
 
-  const topProducts = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
-    .map(([code, qty]) => ({ code, name: productMap.get(code)?.name || code, qty }));
-  const lowStock = (products.results || [])
-    .filter((item) => Number(item.stock) <= 10)
-    .sort((a, b) => Number(a.stock) - Number(b.stock))
-    .slice(0, 10)
-    .map((item) => ({ name: item.name, stock: item.stock, category: item.category }));
-  const busyHours = [...hours.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([hour, count]) => ({ hour, count }));
+  // Hitung kombinasi produk yang muncul dalam transaksi yang sama, tanpa query per transaksi.
+  for (const tx of txMap.values()) {
+    if (!Number.isFinite(tx.timestamp) || tx.timestamp < current30 || tx.items.length < 2) continue;
+    const codes = [...new Set(tx.items.map((item) => item.code))].sort();
+    for (let i = 0; i < codes.length; i++) for (let j = i + 1; j < codes.length; j++) {
+      const key = `${codes[i]}::${codes[j]}`;
+      pairCounts.set(key, (pairCounts.get(key) || 0) + 1);
+    }
+  }
+
+  const sortedStats = [...productStats.values()].sort((a, b) => b.seven - a.seven || b.all - a.all);
+  const topAll = [...productStats.values()].sort((a, b) => b.all - a.all).slice(0, 5)
+    .map((item) => ({ code: item.code, name: productMap.get(item.code)?.name || item.name, qty: item.all }));
+  const top7 = sortedStats.filter((item) => item.seven > 0).slice(0, 5)
+    .map((item) => ({ code: item.code, nama: productMap.get(item.code)?.name || item.name, qty: item.seven }));
+  const lowStock = products.filter((item) => Number(item.stock) <= 10)
+    .sort((a, b) => Number(a.stock) - Number(b.stock)).slice(0, 10)
+    .map((item) => ({ code: item.code, name: item.name, stock: Number(item.stock), category: item.category }));
+  const risikoStok = products.map((item) => {
+    const stat = productStats.get(item.code);
+    const sold7 = stat?.seven || 0;
+    const dailyRate = sold7 / 7;
+    const stock = Number(item.stock || 0);
+    const daysLeft = dailyRate > 0 ? Math.floor(stock / dailyRate) : null;
+    return { code: item.code, nama: item.name, stok: stock, terjual_7_hari: sold7, hari_tersisa: daysLeft };
+  }).filter((item) => item.terjual_7_hari > 0 && (item.stok === 0 || item.hari_tersisa <= 7))
+    .sort((a, b) => (a.hari_tersisa ?? -1) - (b.hari_tersisa ?? -1));
+  const historyDays = Number.isFinite(oldestTransactionTimestamp) ? Math.floor((now - oldestTransactionTimestamp) / dayMs) : 0;
+  const slowMovers = historyDays >= 30
+    ? products.filter((item) => Number(item.stock) > 0 && !(productStats.get(item.code)?.thirty > 0))
+      .slice(0, 8).map((item) => ({ nama: item.name, stok: Number(item.stock) }))
+    : [];
+  const topPairs = [...pairCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([key, count]) => {
+    const [a, b] = key.split("::");
+    return { produk: [productMap.get(a)?.name || a, productMap.get(b)?.name || b], transaksi_bersama: count };
+  });
+  let trend = { status: "belum_cukup", keterangan: "Belum ada pembanding 7 hari sebelumnya yang memadai." };
+  if (countPrevious7 > 0) {
+    const delta = totalPrevious7 > 0 ? ((total7 - totalPrevious7) / totalPrevious7) * 100 : null;
+    trend = delta === null
+      ? { status: "baru_tercatat", keterangan: `Penjualan 7 hari terakhir ${rupiah(total7)}; periode pembanding belum memiliki nilai penjualan.` }
+      : { status: delta >= 10 ? "naik" : delta <= -10 ? "turun" : "stabil", perubahan_persen: Math.round(delta), keterangan: `Penjualan 7 hari terakhir ${rupiah(total7)} dibanding ${rupiah(totalPrevious7)} pada 7 hari sebelumnya (${delta >= 0 ? "+" : ""}${Math.round(delta)}%).` };
+  }
+
   const facts = {
-    jumlah_transaksi: (transactions.results || []).length,
-    total_penjualan: totalSales,
-    produk_terlaris: topProducts,
+    jumlah_transaksi: txMap.size,
+    transaksi_7_hari: count7,
+    transaksi_30_hari: count30,
+    periode_data_hari: historyDays,
+    total_penjualan: totalAll,
+    penjualan_7_hari: total7,
+    penjualan_7_hari_sebelumnya: totalPrevious7,
+    tren_penjualan: trend,
+    produk_terlaris: topAll,
+    produk_terlaris_7_hari: top7,
     stok_menipis: lowStock,
-    jam_ramai: busyHours,
+    risiko_stok: risikoStok,
+    produk_tidak_bergerak: slowMovers,
+    kombinasi_produk: topPairs,
+    catatan_jam_ramai: "Zona waktu toko belum dikonfigurasi; analisis jam ramai ditunda agar tidak menampilkan jam yang keliru.",
   };
+  const recommendations = buildInsightRecommendations(facts, focus);
   const fallback = {
-    ringkasan: facts.jumlah_transaksi
-      ? `Terdapat ${facts.jumlah_transaksi} transaksi dengan total penjualan ${rupiah(totalSales)}.`
-      : "Belum ada transaksi yang cukup untuk menghasilkan insight penjualan.",
-    produk_terlaris: topProducts.length
-      ? `${topProducts[0].name} menjadi produk paling banyak terjual sebanyak ${topProducts[0].qty} unit.`
-      : "Belum ada produk terlaris karena belum ada transaksi.",
-    stok_menipis: lowStock.length
-      ? `${lowStock.map((item) => `${item.name} (${item.stock})`).join(", ")} perlu diprioritaskan untuk restok.`
-      : "Belum ada produk pada batas stok rendah.",
-    saran_penjualan: topProducts.length
-      ? `Buat paket promo atau penempatan rak khusus untuk ${topProducts.slice(0, 3).map((item) => item.name).join(", ")}.`
-      : "Mulai catat transaksi agar sistem dapat memberi saran penjualan.",
-    jam_ramai: busyHours.length
-      ? `Aktivitas tertinggi tercatat sekitar pukul ${busyHours.map((item) => `${String(item.hour).padStart(2, "0")}:00`).join(", ")}.`
-      : "Belum ada waktu transaksi yang cukup untuk menentukan jam ramai.",
+    ringkasan: txMap.size
+      ? `${count7} transaksi tercatat dalam 7 hari terakhir dengan penjualan ${rupiah(total7)}. ${trend.keterangan}`
+      : "Belum ada transaksi yang cukup untuk menyimpulkan pola penjualan. Mulai catat transaksi agar analisis dapat terbentuk.",
+    produk_terlaris: top7.length ? `${top7[0].nama} terjual ${top7[0].qty} unit dalam 7 hari terakhir.` : "Belum ada penjualan produk dalam 7 hari terakhir.",
+    stok_menipis: risikoStok.length ? risikoStok.slice(0, 3).map((item) => `${item.nama}: stok ${item.stok}, terjual ${item.terjual_7_hari} unit/7 hari`).join("; ") : "Belum ditemukan risiko stok berdasarkan laju penjualan 7 hari terakhir.",
+    jam_ramai: facts.catatan_jam_ramai,
+    saran_penjualan: recommendations[0]?.action || "Lanjutkan pencatatan transaksi agar rekomendasi semakin akurat.",
+    kartu: [
+      { judul: "Penjualan 7 hari", isi: rupiah(total7), tipe: "success" },
+      { judul: "Transaksi 7 hari", isi: String(count7), tipe: "info" },
+      { judul: "Risiko stok", isi: `${risikoStok.length} produk`, tipe: risikoStok.length ? "warning" : "success" },
+      { judul: "Produk bergerak", isi: `${top7.length} produk terjual`, tipe: "info" },
+    ],
   };
-  fallback.kartu = [
-    { judul: "Produk Terlaris", isi: topProducts[0]?.name || "Belum tersedia data", tipe: "success" },
-    { judul: "Stok Menipis", isi: lowStock.length ? `${lowStock.length} produk perlu restok` : "Stok masih aman", tipe: "warning" },
-    { judul: "Saran Penjualan", isi: topProducts.length ? "Pertimbangkan paket promo" : "Mulai catat transaksi", tipe: "info" },
-    { judul: "Jam Ramai", isi: busyHours.length ? `${String(busyHours[0].hour).padStart(2, "0")}:00` : "Belum tersedia", tipe: "info" },
-  ];
 
-  // Ringkasan dasar tetap tersedia tanpa layanan eksternal atau API key Gemini.
   if (!env.GEMINI_API_KEY) {
-    return json({
-      success: false,
-      needs_key: true,
-      message: "API key Gemini belum dipasang.",
-      setup: "Simpan API key sebagai secret Pages GEMINI_API_KEY pada project kasir-bisa.",
-      facts,
-      insight: fallback,
-    });
+    return json({ success: false, needs_key: true, message: "Analisis berbasis data tetap tersedia tanpa AI.", setup: "Pengelola dapat mengaktifkan Gemini melalui secret GEMINI_API_KEY.", facts, recommendations, insight: fallback, focus });
   }
 
-  const model = env.GEMINI_MODEL || "gemini-3.8-flash";
-  const prompt = `Anda adalah asisten analisis usaha Kasir Bisa untuk UMKM Indonesia.
-Jawab hanya berdasarkan data, gunakan bahasa Indonesia, dan kembalikan JSON valid dengan struktur:
-{"ringkasan":"...","produk_terlaris":"...","stok_menipis":"...","saran_penjualan":"...","jam_ramai":"...","kartu":[{"judul":"...","isi":"...","tipe":"success|warning|info"}]}
-Jangan mengarang angka. Jika data kurang, sebutkan bahwa data belum cukup.
-DATA: ${JSON.stringify(facts)}`;
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
+  const model = getGeminiModel(env);
+  const prompt = `Anda adalah pendamping usaha mikro Indonesia. Gunakan bahasa Indonesia yang sederhana, hangat, tidak menggurui, dan langsung bisa dilakukan.
+Fokus pemilik: ${focus}. Prioritaskan rekomendasi yang relevan dengan fokus tersebut, tetapi jangan abaikan risiko stok yang mendesak.
+Anda hanya boleh merangkum fakta yang diberikan. Jangan menghitung ulang atau mengarang angka, nama produk, harga modal, laba, maupun jam ramai. Jangan menyarankan diskon/harga tanpa data margin.
+Kembalikan JSON valid: {"ringkasan":"maksimal 2 kalimat", "saran_penjualan":"satu tindakan paling penting", "penjelasan_fokus":"satu kalimat yang menjelaskan bagaimana fokus dipakai"}.
+FAKTA: ${JSON.stringify(facts)}
+REKOMENDASI TERHITUNG SISTEM: ${JSON.stringify(recommendations)}`;
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.25, maxOutputTokens: 800, responseMimeType: "application/json" },
-      }),
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 500, responseMimeType: "application/json" } }),
+    });
+    const rawResponse = await response.text();
+    let gemini = {};
+    try { gemini = rawResponse ? JSON.parse(rawResponse) : {}; } catch { gemini = {}; }
+    if (!response.ok) {
+      const providerMessage = extractGeminiError(gemini, rawResponse, response.status);
+      console.error("[GEMINI INSIGHT ERROR]", { status: response.status, model, message: providerMessage });
+      return json({
+        success: false,
+        error: "Layanan AI belum dapat digunakan",
+        detail: `${geminiErrorMessage(response.status)} Detail: ${providerMessage}. Rekomendasi berbasis data tetap ditampilkan.`,
+        facts,
+        recommendations,
+        insight: fallback,
+        focus
+      }, response.status === 429 || response.status >= 500 ? 503 : 502);
     }
-  );
-  if (!response.ok) {
-    return json({
-      success: false,
-      error: "Gemini API menolak permintaan",
-      detail: `${geminiErrorMessage(response.status)} Insight cadangan tetap ditampilkan.`,
-      facts,
-      insight: fallback,
-    }, 502);
+    const generated = parseGeminiJson(gemini.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("") || "") || {};
+    const safeInsight = {
+      ...fallback,
+      ringkasan: typeof generated.ringkasan === "string" && generated.ringkasan.length < 600 ? generated.ringkasan : fallback.ringkasan,
+      saran_penjualan: typeof generated.saran_penjualan === "string" && generated.saran_penjualan.length < 500 ? generated.saran_penjualan : fallback.saran_penjualan,
+    };
+    return json({ success: true, facts, recommendations, insight: safeInsight, focus, source: "Gemini + analisis data" });
+  } catch (error) {
+    console.error("[GEMINI INSIGHT NETWORK ERROR]", { model, message: error?.message || String(error) });
+    return json({ success: false, error: "Layanan AI tidak dapat dijangkau", detail: `${error?.message || "Koneksi ke Gemini gagal."} Rekomendasi berbasis data tetap ditampilkan.`, facts, recommendations, insight: fallback, focus }, 503);
   }
-  const gemini = await response.json();
-  const text = gemini.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("") || "";
-  return json({ success: true, facts, insight: parseGeminiJson(text) || fallback, source: "Gemini" });
+}
+
+
+// Pusat Perhatian Toko: deteksi berbasis data yang benar-benar tersedia di D1.
+async function refreshStoreAlerts(env, businessId) {
+  const [productsResult, salesResult] = await Promise.all([
+    env.DB.prepare("SELECT code, name, stock FROM products WHERE business_id = ?").bind(businessId).all(),
+    env.DB.prepare(`
+      SELECT ti.product_code, SUM(ti.qty) AS qty
+      FROM transaction_items ti
+      JOIN transactions t ON t.id = ti.transaction_id
+      WHERE t.business_id = ? AND t.waktu >= ?
+      GROUP BY ti.product_code
+    `).bind(businessId, new Date(Date.now() - 7 * 86400000).toISOString()).all(),
+  ]);
+  const sold = new Map((salesResult.results || []).map(row => [row.product_code, Number(row.qty || 0)]));
+  const detected = [];
+  for (const product of productsResult.results || []) {
+    const stock = Number(product.stock || 0);
+    const sold7 = sold.get(product.code) || 0;
+    if (stock <= 0) {
+      detected.push({ key: `stock-empty:${product.code}`, category: "stok", priority: "tinggi",
+        title: `Stok ${product.name} sudah habis`,
+        message: `Persediaan ${product.name} tercatat 0 unit.`,
+        evidence: { product_code: product.code, stock, sold_7_days: sold7 },
+        action_label: "Lihat Produk", action_type: "product", action_payload: { code: product.code } });
+    } else if (stock <= 5 || (sold7 > 0 && Math.floor(stock / (sold7 / 7)) <= 7)) {
+      detected.push({ key: `stock-low:${product.code}`, category: "stok", priority: stock <= 2 ? "tinggi" : "sedang",
+        title: `Stok ${product.name} perlu diperiksa`,
+        message: `Stok tersisa ${stock} unit${sold7 ? ` dan ${sold7} unit terjual dalam 7 hari terakhir` : ""}.`,
+        evidence: { product_code: product.code, stock, sold_7_days: sold7 },
+        action_label: "Lihat Produk", action_type: "product", action_payload: { code: product.code } });
+    }
+  }
+  const [cur, prev] = await Promise.all([
+    env.DB.prepare("SELECT COALESCE(SUM(total),0) AS total, COUNT(*) AS n FROM transactions WHERE business_id = ? AND waktu >= ?")
+      .bind(businessId, new Date(Date.now() - 7 * 86400000).toISOString()).first(),
+    env.DB.prepare("SELECT COALESCE(SUM(total),0) AS total, COUNT(*) AS n FROM transactions WHERE business_id = ? AND waktu >= ? AND waktu < ?")
+      .bind(businessId, new Date(Date.now() - 14 * 86400000).toISOString(), new Date(Date.now() - 7 * 86400000).toISOString()).first(),
+  ]);
+  if (Number(prev?.n) > 0 && Number(prev.total) > 0) {
+    const change = ((Number(cur.total) - Number(prev.total)) / Number(prev.total)) * 100;
+    if (change <= -20) detected.push({ key: "sales-drop-7d", category: "penjualan", priority: "sedang",
+      title: "Penjualan menurun dibanding pekan sebelumnya",
+      message: `Penjualan 7 hari terakhir turun ${Math.round(Math.abs(change))}% dibanding 7 hari sebelumnya.`,
+      evidence: { current_7_days: Number(cur.total), previous_7_days: Number(prev.total), change_percent: Math.round(change) },
+      action_label: "Tanya Smart Insight", action_type: "chat", action_payload: { prompt: "Bantu analisis penurunan penjualan toko saya." } });
+    else if (change >= 20) detected.push({ key: "sales-rise-7d", category: "penjualan", priority: "info",
+      title: "Penjualan meningkat",
+      message: `Penjualan 7 hari terakhir naik ${Math.round(change)}% dibanding 7 hari sebelumnya.`,
+      evidence: { current_7_days: Number(cur.total), previous_7_days: Number(prev.total), change_percent: Math.round(change) },
+      action_label: "Lihat Smart Insight", action_type: "insight", action_payload: {} });
+  }
+  const active = await env.DB.prepare("SELECT id, alert_key FROM store_alerts WHERE business_id = ? AND status IN ('baru','dibaca','ditangani')")
+    .bind(businessId).all();
+  const keys = new Set(detected.map(item => item.key));
+  const statements = detected.map(item => env.DB.prepare(`
+    INSERT INTO store_alerts
+      (id,business_id,alert_key,category,priority,title,message,evidence_json,action_label,action_type,action_payload_json,status,first_seen_at,last_seen_at,created_at,updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,'baru',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+    ON CONFLICT(business_id,alert_key) WHERE status IN ('baru','dibaca','ditangani')
+    DO UPDATE SET category=excluded.category,priority=excluded.priority,title=excluded.title,message=excluded.message,
+      evidence_json=excluded.evidence_json,action_label=excluded.action_label,action_type=excluded.action_type,
+      action_payload_json=excluded.action_payload_json,last_seen_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+  `).bind(crypto.randomUUID(), businessId, item.key, item.category, item.priority, item.title, item.message,
+    JSON.stringify(item.evidence), item.action_label, item.action_type, JSON.stringify(item.action_payload)));
+  for (const row of active.results || []) {
+    if (!keys.has(row.alert_key)) statements.push(env.DB.prepare(
+      "UPDATE store_alerts SET status='selesai',resolved_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE business_id=? AND id=? AND status IN ('baru','dibaca','ditangani')"
+    ).bind(businessId, row.id));
+  }
+  if (statements.length) await env.DB.batch(statements);
+}
+
+async function storeAlertsApi(request, env, businessId, pathname) {
+  if (request.method === "GET" && pathname === "/api/store-alerts") {
+    try {
+      await refreshStoreAlerts(env, businessId);
+      const result = await env.DB.prepare("SELECT * FROM store_alerts WHERE business_id=? ORDER BY CASE priority WHEN 'tinggi' THEN 0 WHEN 'sedang' THEN 1 ELSE 2 END, created_at DESC LIMIT 100")
+        .bind(businessId).all();
+      const unread = await env.DB.prepare("SELECT COUNT(*) AS n FROM store_alerts WHERE business_id=? AND status='baru'").bind(businessId).first();
+      return json({ alerts: (result.results || []).map(row => ({ ...row, evidence: JSON.parse(row.evidence_json || "{}"), action_payload: JSON.parse(row.action_payload_json || "{}") })), unread: Number(unread?.n || 0) });
+    } catch (error) {
+      const detail = error?.message || String(error);
+      console.error("[STORE ALERTS REFRESH ERROR]", { businessId, message: detail });
+      if (/no such table:\s*store_alerts/i.test(detail)) {
+        return json({ error: "Pusat Perhatian belum siap pada database lokal.", detail: "Terapkan migrasi D1 lokal 0006_store_alerts.sql dengan perintah npm run d1:migrate:local, lalu muat ulang halaman." }, 503);
+      }
+      return json({ error: "Pusat Perhatian gagal memuat notifikasi.", detail }, 503);
+    }
+  }
+  const match = pathname.match(/^\/api\/store-alerts\/([\w-]+)$/);
+  if (!match || request.method !== "PATCH") return json({ error: "Endpoint notifikasi tidak ditemukan." }, 404);
+  const body = await parseJsonBody(request) || {};
+  const status = body.status;
+  if (!["dibaca", "ditangani", "selesai", "tidak_relevan"].includes(status)) return json({ error: "Status notifikasi tidak valid." }, 400);
+  const result = await env.DB.prepare(`UPDATE store_alerts SET status=?,read_at=CASE WHEN ? IN ('dibaca','ditangani','selesai') THEN COALESCE(read_at,CURRENT_TIMESTAMP) ELSE read_at END,
+    resolved_at=CASE WHEN ? IN ('selesai','tidak_relevan') THEN CURRENT_TIMESTAMP ELSE NULL END,updated_at=CURRENT_TIMESTAMP
+    WHERE business_id=? AND id=?`).bind(status, status, status, businessId, decodeURIComponent(match[1])).run();
+  if (!result.meta.changes) return json({ error: "Notifikasi tidak ditemukan." }, 404);
+  return json({ success: true });
+}
+
+async function getAssistantContext(env, businessId) {
+  const [sales, products, recent] = await Promise.all([
+    env.DB.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(total),0) AS total FROM transactions WHERE business_id=? AND waktu>=?")
+      .bind(businessId, new Date(Date.now()-30*86400000).toISOString()).first(),
+    env.DB.prepare("SELECT code,name,category,price,stock FROM products WHERE business_id=? ORDER BY name").bind(businessId).all(),
+    env.DB.prepare("SELECT t.waktu,t.total,ti.name,ti.qty FROM transactions t JOIN transaction_items ti ON ti.transaction_id=t.id WHERE t.business_id=? ORDER BY t.waktu DESC LIMIT 100")
+      .bind(businessId).all(),
+  ]);
+  return { ringkasan_30_hari: { jumlah_transaksi: Number(sales?.n||0), total_penjualan: Number(sales?.total||0) },
+    produk: products.results || [], item_transaksi_terbaru: recent.results || [] };
+}
+
+async function callGemini(env, prompt, maxTokens=1200) {
+  if (!env.GEMINI_API_KEY) return { error: "AI belum diaktifkan. Pengelola perlu mengatur GEMINI_API_KEY pada backend." };
+  const model = getGeminiModel(env);
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: String(prompt || "") }] }], generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens } })
+    });
+    const rawResponse = await response.text();
+    let data = {};
+    try { data = rawResponse ? JSON.parse(rawResponse) : {}; } catch { data = {}; }
+    if (!response.ok) {
+      const providerMessage = extractGeminiError(data, rawResponse, response.status);
+      console.error("[GEMINI API ERROR]", { status: response.status, model, message: providerMessage });
+      return { error: `${geminiErrorMessage(response.status)} Detail: ${providerMessage}` };
+    }
+    const text = data.candidates?.[0]?.content?.parts?.map(part => part.text || "").join("").trim() || "";
+    if (!text) {
+      const reason = data.candidates?.[0]?.finishReason || data.promptFeedback?.blockReason || "Respons AI kosong.";
+      console.error("[GEMINI EMPTY RESPONSE]", { model, reason });
+      return { error: `Gemini tidak memberikan jawaban teks (${reason}). Coba ubah pertanyaan.` };
+    }
+    return { text };
+  } catch (error) {
+    console.error("[GEMINI NETWORK ERROR]", { model, message: error?.message || String(error) });
+    return { error: "Tidak dapat terhubung ke Gemini. Periksa koneksi server dan coba lagi." };
+  }
+}
+
+async function signActionToken(env, payload) {
+  const key = await crypto.subtle.importKey("raw", textEncoder.encode(env.AUTH_SESSION_SECRET), {name:"HMAC",hash:"SHA-256"}, false, ["sign"]);
+  const encoded = bytesToBase64Url(textEncoder.encode(JSON.stringify(payload)));
+  const sig = await crypto.subtle.sign("HMAC", key, textEncoder.encode(encoded));
+  return `${encoded}.${bytesToBase64Url(new Uint8Array(sig))}`;
+}
+async function verifyActionToken(env, token) {
+  try {
+    const [encoded, signature, ...extra] = String(token||"").split(".");
+    if (!encoded || !signature || extra.length) return null;
+    const key = await crypto.subtle.importKey("raw", textEncoder.encode(env.AUTH_SESSION_SECRET), {name:"HMAC",hash:"SHA-256"}, false, ["verify"]);
+    if (!await crypto.subtle.verify("HMAC", key, base64UrlToBytes(signature), textEncoder.encode(encoded))) return null;
+    const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded)));
+    return payload.exp > Date.now() ? payload : null;
+  } catch { return null; }
+}
+
+async function assistantApi(request, env, businessId, pathname) {
+  const body = await parseJsonBody(request);
+  if (!body) return json({ error:"Format pesan tidak valid." },400);
+  const context = await getAssistantContext(env,businessId);
+  if (pathname === "/api/smart-insight/chat" && request.method === "POST") {
+    const message = typeof body.message === "string" ? body.message.trim().slice(0,2000) : "";
+    const mode = body.mode === "creation" ? "creation" : "chat";
+    if (!message) return json({error:"Tuliskan pertanyaan terlebih dahulu."},400);
+    const prompt = `Anda adalah Tanya Smart Insight, pendamping pemilik UMKM. Jawab bahasa Indonesia yang ramah, ringkas, praktis. Data berikut hanya milik toko yang sedang login. Gunakan hanya fakta ini; bila data tidak cukup katakan apa adanya. Tidak tersedia harga modal/laba/kedaluwarsa. Jangan mengeksekusi atau mengklaim perubahan data.
+Mode: ${mode === "creation" ? "AI Creation: hasilkan konten yang diminta, siap disalin. Gunakan detail produk hanya jika cocok dengan data." : "Konsultasi kondisi usaha berbasis data."}
+DATA TOKO: ${JSON.stringify(context)}
+RIWAYAT SINGKAT: ${JSON.stringify(Array.isArray(body.history)?body.history.slice(-8):[])}
+PERTANYAAN: ${message}`;
+    const answer = await callGemini(env,prompt,1600);
+    if (answer.error) return json({error:answer.error},503);
+    return json({success:true,answer:answer.text,mode});
+  }
+  if (pathname === "/api/smart-insight/action/prepare" && request.method === "POST") {
+    const instruction = typeof body.instruction === "string" ? body.instruction.trim().slice(0,1000) : "";
+    if (!instruction) return json({error:"Jelaskan perubahan yang diinginkan."},400);
+    const prompt = `Ekstrak permintaan tindakan dari pemilik toko. Balas JSON saja dengan skema {"action":"create_product|update_product|add_stock|none","product_name":"","new_name":"","price":0,"stock":0,"category":"","reason":""}. Jangan menebak data yang tidak disebutkan. Untuk update harga isi price; untuk tambah stok isi stock. Produk yang dirujuk harus cocok dengan daftar produk.
+Produk: ${JSON.stringify(context.produk)}
+Permintaan: ${instruction}`;
+    const result = await callGemini(env,prompt,500);
+    if (result.error) return json({error:result.error},503);
+    const parsed = parseGeminiJson(result.text);
+    if (!parsed || !["create_product","update_product","add_stock","none"].includes(parsed.action)) return json({error:"AI belum dapat memahami tindakan tersebut. Coba jelaskan lebih spesifik."},422);
+    let action = {type:parsed.action};
+    let summary = "";
+    if (parsed.action === "create_product") {
+      const name=String(parsed.product_name||"").trim(), price=Number(parsed.price), stock=Number(parsed.stock||0), category=String(parsed.category||"Umum").trim();
+      if (!name || !Number.isSafeInteger(price)||price<=0||!Number.isSafeInteger(stock)||stock<0) return json({error:"Untuk membuat produk baru, nama, harga, dan stok harus jelas."},422);
+      action={type:"create_product",name,price,stock,category,barcode:`AI-${crypto.randomUUID()}`}; summary=`Tambahkan produk ${name}, harga ${rupiah(price)}, stok ${stock} unit, kategori ${category}. Barcode internal akan dibuat otomatis.`;
+    } else if (parsed.action === "update_product" || parsed.action === "add_stock") {
+      const name=String(parsed.product_name||"").trim();
+      const product=context.produk.find(p=>p.name.toLowerCase()===name.toLowerCase());
+      if (!product) return json({error:`Produk “${name||"yang dimaksud"}” tidak ditemukan dengan nama yang sama. Periksa nama produk di daftar produk.`},404);
+      if (parsed.action==="update_product") {
+        const price=Number(parsed.price);
+        if(!Number.isSafeInteger(price)||price<=0) return json({error:"Harga baru belum valid."},422);
+        action={type:"update_product",code:product.code,price}; summary=`Ubah harga ${product.name} dari ${rupiah(product.price)} menjadi ${rupiah(price)}.`;
+      } else {
+        const qty=Number(parsed.stock);
+        if(!Number.isSafeInteger(qty)||qty<=0||qty>100000) return json({error:"Jumlah stok tambahan belum valid."},422);
+        action={type:"add_stock",code:product.code,stock_before:Number(product.stock),quantity:qty}; summary=`Tambahkan ${qty} unit stok ${product.name}. Stok saat ini ${product.stock}, setelah perubahan menjadi ${Number(product.stock)+qty} unit.`;
+      }
+    } else return json({error:"Permintaan ini belum dapat diterjemahkan menjadi tindakan produk yang aman. Silakan gunakan Tanya Smart Insight."},422);
+    const token=await signActionToken(env,{businessId,action,exp:Date.now()+5*60*1000,nonce:crypto.randomUUID()});
+    return json({success:true,preview:{summary,expires_in_seconds:300},confirmation_token:token});
+  }
+  if (pathname === "/api/smart-insight/action/confirm" && request.method === "POST") {
+    const payload=await verifyActionToken(env,body.confirmation_token);
+    if(!payload||payload.businessId!==businessId) return json({error:"Persetujuan sudah kedaluwarsa atau tidak valid. Siapkan tindakan kembali."},400);
+    const a=payload.action;
+    if(a.type==="create_product") {
+      const duplicate=await env.DB.prepare("SELECT code FROM products WHERE business_id=? AND barcode=?").bind(businessId,a.barcode).first();
+      if(duplicate) return json({error:"Barcode tersebut sudah digunakan produk lain."},409);
+      const next=await env.DB.prepare("SELECT COALESCE(MAX(CAST(id AS INTEGER)),0)+1 AS nomor FROM products WHERE business_id=?").bind(businessId).first();
+      const code=`K${String(next.nomor).padStart(2,"0")}`;
+      await env.DB.prepare("INSERT INTO products (id,business_id,code,barcode,name,category,price,stock,image) VALUES (?,?,?,?,?,?,?,?,?)")
+        .bind(String(next.nomor),businessId,code,a.barcode,a.name,a.category,a.price,a.stock,"").run();
+      return json({success:true,message:`Produk ${a.name} berhasil ditambahkan.`,code});
+    }
+    if(a.type==="update_product") {
+      const r=await env.DB.prepare("UPDATE products SET price=? WHERE business_id=? AND code=?").bind(a.price,businessId,a.code).run();
+      if(!r.meta.changes)return json({error:"Produk tidak ditemukan atau sudah berubah."},409);
+      return json({success:true,message:"Harga produk berhasil diperbarui."});
+    }
+    if(a.type==="add_stock") {
+      const r=await env.DB.prepare("UPDATE products SET stock=stock+? WHERE business_id=? AND code=? AND stock=?")
+        .bind(a.quantity,businessId,a.code,a.stock_before).run();
+      if(!r.meta.changes)return json({error:"Stok produk sudah berubah. Muat ulang data sebelum mencoba lagi."},409);
+      return json({success:true,message:"Stok produk berhasil ditambahkan."});
+    }
+    return json({error:"Jenis tindakan tidak dikenal."},400);
+  }
+  return json({error:"Endpoint Tanya Smart Insight tidak ditemukan."},404);
 }
 
 export default {
@@ -806,6 +1219,10 @@ export default {
         return await authApi(request, env, url.pathname);
       }
       if (url.pathname.startsWith("/api/")) {
+        const requestOrigin = request.headers.get("Origin");
+        if (request.method !== "GET" && requestOrigin && requestOrigin !== url.origin) {
+          return json({ error: "Permintaan lintas situs ditolak." }, 403);
+        }
         if (!sessionSecretConfigured(env)) {
           return json({ error: AUTH_SETUP_MESSAGE }, 503);
         }
@@ -820,14 +1237,26 @@ export default {
         if (url.pathname === "/api/transactions") {
           return await transactionsApi(request, env, user.business_id);
         }
+        if (url.pathname === "/api/store-alerts" || url.pathname.startsWith("/api/store-alerts/")) {
+          return await storeAlertsApi(request, env, user.business_id, url.pathname);
+        }
+        if (url.pathname.startsWith("/api/smart-insight/chat") || url.pathname.startsWith("/api/smart-insight/action/")) {
+          return await assistantApi(request, env, user.business_id, url.pathname);
+        }
         if (url.pathname === "/api/smart-insight" && request.method === "POST") {
-          return await smartInsightApi(env, user.business_id);
+          return await smartInsightApi(request, env, user.business_id);
         }
         return json({ error: "Endpoint API tidak ditemukan" }, 404);
       }
       return await env.ASSETS.fetch(request);
     } catch (error) {
-      return json({ error: "Permintaan gagal diproses", detail: error.message }, 500);
+      console.error("[KASIR BISA BACKEND ERROR]", {
+        path: url.pathname,
+        method: request.method,
+        message: error?.message || String(error),
+        stack: error?.stack || null
+      });
+      return json({ error: "Permintaan gagal diproses", detail: error?.message || "Kesalahan internal backend." }, 500);
     }
   },
 };

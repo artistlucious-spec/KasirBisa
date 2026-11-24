@@ -9,6 +9,7 @@ Kasir Bisa Web menggunakan Cloudflare D1 melalui binding `DB`. Konfigurasi datab
 - `0003_owner_profile.sql`: profil pemilik tunggal untuk login dan pengaturan akun.
 - `0004_multi_tenant_accounts.sql`: akun dan usaha, pemisahan data per usaha, serta pemindahan akun/data lama.
 - `0005_password_encrypted.sql`: menambahkan kolom password terenkripsi untuk tampilan password pada profil.
+- `0006_store_alerts.sql`: menambahkan penyimpanan Pusat Perhatian Toko dengan status, prioritas, bukti analisis, dan pencegahan duplikasi notifikasi aktif per usaha.
 
 Jalankan `npm run d1:migrate:local` untuk D1 lokal. Setelah menerapkan `0005_password_encrypted.sql`, pengguna lama harus login kembali agar aplikasi dapat membuat salinan password terenkripsi dari password yang baru diverifikasi. Jalankan `npm run d1:migrate:remote` hanya setelah memastikan akun Cloudflare dan database remote yang dikonfigurasi adalah milik project Pages `kasirbisa`. Jangan menjalankan migrasi remote tanpa memeriksa target database.
 
@@ -33,6 +34,14 @@ Menyimpan ID transaksi, `business_id`, waktu, subtotal, diskon, PPN, total, uang
 ### `transaction_items`
 
 Menyimpan rincian item per transaksi: kode produk, nama dan harga saat transaksi, serta kuantitas. Relasi `transaction_id` mengarah ke `transactions`.
+
+### `store_alerts`
+
+Menyimpan notifikasi dan saran pada modul Pusat Perhatian Toko. Setiap baris terikat ke `business_id`, sehingga notifikasi antarusaha terpisah. `alert_key` menjadi identitas stabil suatu isu; indeks unik parsial memastikan hanya ada satu notifikasi aktif untuk isu yang sama dalam satu usaha. Notifikasi berstatus `selesai` atau `tidak_relevan` tidak menghalangi isu yang sama dibuat kembali di kemudian hari.
+
+Kategori yang diizinkan: `stok`, `penjualan`, `produk`, `peluang`, dan `aktivitas`. Prioritas: `tinggi`, `sedang`, dan `info`. Status: `baru`, `dibaca`, `ditangani`, `selesai`, dan `tidak_relevan`. `evidence_json` menyimpan bukti/data pendukung; `action_label`, `action_type`, dan `action_payload_json` disediakan untuk tindakan lanjutan yang akan memerlukan validasi serta persetujuan pengguna. `read_at`, `resolved_at`, dan `expires_at` mendukung pengelolaan siklus notifikasi.
+
+Badge notifikasi baru dihitung dari baris berstatus `baru` untuk `business_id` yang sedang login. Aplikasi tetap harus mengambil `business_id` dari sesi terverifikasi, bukan dari input bebas browser.
 
 ## Formula transaksi
 

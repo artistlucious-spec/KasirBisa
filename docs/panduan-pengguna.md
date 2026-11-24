@@ -43,3 +43,15 @@ Produk, stok, dan transaksi tersimpan di akun usaha Anda dan terpisah dari usaha
 - Pembayaran gagal: periksa jumlah uang dan stok produk.
 - Tidak dapat menyimpan perubahan profil: pastikan password saat ini benar dan nama pengguna belum digunakan akun lain. Jika masih gagal, hubungi pengelola Kasir Bisa.
 - Jika diminta masuk kembali, gunakan nama pengguna atau nomor WhatsApp beserta password.
+
+## Menggunakan Smart Insight
+1. Buka menu Smart Insight.
+2. Pilih Otomatis atau salah satu fokus yang tersedia.
+3. Periksa prioritas, bukti, dan tindakan yang disarankan.
+4. Tekan Buat insight baru untuk memperbarui analisis setelah transaksi atau stok berubah.
+
+## Mengubah identitas toko
+Buka Profil Usaha, ubah nama toko atau foto profil, lalu tekan Simpan perubahan. Identitas terbaru akan tampil pada header halaman aplikasi.
+
+## Menyimpan atau membagikan struk
+Setelah pembayaran berhasil, pilih Simpan gambar untuk mengunduh PNG, Bagikan untuk menggunakan fitur berbagi perangkat (atau alternatif WhatsApp berbentuk teks), dan Cetak untuk mencetak struk.

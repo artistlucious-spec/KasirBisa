@@ -54,3 +54,8 @@ Deploy website Pages dengan `npm run deploy`. Secrets tidak dimasukkan ke source
 - [Informasi penting sebelum menjalankan](Note/info%20penting.md)
 - [Panduan proyek untuk guru dan AI](Note/penjelasan.md)
 - [Panduan dalam aplikasi](src/panduan.html)
+## Pemecahan masalah Smart Insight (lokal)
+
+- Jika `/api/store-alerts` menampilkan `no such table: store_alerts`, jalankan `npm run d1:migrate:local` dari folder proyek, tunggu sampai migrasi `0006_store_alerts.sql` selesai, lalu mulai ulang `npm run dev`. Perintah ini hanya menerapkan migrasi ke database lokal Wrangler.
+- Jika Gemini menampilkan `unexpected model name format`, buka `.dev.vars` dan pastikan baris model berisi `GEMINI_MODEL=gemini-3.8-flash` (tanpa tanda kutip dan bukan teks contoh seperti `MODEL_GEMINI_YANG_DIDUKUNG`). Pastikan `GEMINI_API_KEY` berisi API key aktif yang dibuat sendiri di Google AI Studio.
+- Jika analisis Gemini gagal, ringkasan dan rekomendasi berbasis data lokal tetap dikirim oleh endpoint Smart Insight. Periksa detail aman di terminal; jangan membagikan isi `.dev.vars` atau API key.

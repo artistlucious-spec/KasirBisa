@@ -26,3 +26,12 @@
 - Menu hamburger mengakses Kasir, Rekap, Smart Insight, Panduan, Profil, dan Keluar.
 - Halaman Profil menampilkan nama usaha dan WhatsApp, serta dapat mengganti username, password dengan verifikasi password saat ini, dan foto profil.
 - Panduan tersedia sebagai halaman website dan dokumentasi Markdown.
+
+## Smart Insight Hybrid
+Smart Insight menggabungkan analisis otomatis dan fokus pilihan pemilik: otomatis, meningkatkan penjualan, mengelola stok, produk terlaris, atau produk kurang laku. Rekomendasi memuat temuan, bukti data, prioritas, dan tindakan. Analisis tren membandingkan dua periode tujuh hari. Risiko stok dihitung dari penjualan tujuh hari dan stok saat ini. Rekomendasi berbasis aturan tetap tersedia ketika layanan Gemini belum aktif. Analisis jam ramai ditunda sampai zona waktu usaha dapat ditentukan dengan benar.
+
+## Identitas toko
+Pemilik dapat memperbarui nama toko dan foto profil dari halaman Profil Usaha. Nama toko dan foto pemilik ditampilkan pada header halaman privat aplikasi.
+
+## Struk digital
+Setelah transaksi berhasil, struk ditampilkan dalam tata letak digital. Pengguna dapat menyimpan struk sebagai PNG, membagikan file melalui fitur berbagi perangkat jika didukung browser, atau mencetaknya. Jika berbagi gambar tidak didukung, aplikasi menyediakan alternatif berbagi ringkasan teks melalui WhatsApp.
