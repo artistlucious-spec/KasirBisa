@@ -1612,7 +1612,7 @@ function buildInsightRecommendations(facts, focus) {
       item.hari_tersisa !== null && item.hari_tersisa <= 3 ? "tinggi" : "sedang",
       "stok",
       item.stok === 0 ? `Stok ${item.nama} sudah habis` : `Periksa stok ${item.nama}`,
-      `${item.terjual_7_hari} unit terjual dalam 7 hari; stok saat ini ${item.stok}${item.hari_tersisa !== null ? `, perkiraan cukup ${item.hari_tersisa} hari` : ""}.`,
+      `${item.terjual_7_hari} unit terjual dalam 7 hari; stok saat ini ${item.stok}${item.stok > 0 && item.hari_tersisa !== null ? `, perkiraan cukup ${item.hari_tersisa} hari` : ""}.`,
       item.stok === 0 ? `Periksa kebutuhan dan lakukan restok ${item.nama} jika produk masih ingin dijual.` : `Periksa stok fisik dan pertimbangkan restok ${item.nama} sebelum persediaan habis.`,
       "Rekomendasi dihitung dari laju penjualan terbaru dan stok yang tercatat."
     ));
