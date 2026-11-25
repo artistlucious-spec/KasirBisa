@@ -242,7 +242,7 @@ function renderBarChart(target, entries, type) {
 
       const label = createSvgElement("text", {
         x: center,
-        y: baseline + 25,
+        y: baseline + 50,
         class: "report-chart-category",
         "text-anchor": "middle",
         "aria-label": entry.label,
