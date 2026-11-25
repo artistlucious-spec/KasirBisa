@@ -34,20 +34,6 @@ function tampilkanPesan(teks, jenis = "") {
   pesan.className = "notice" + (jenis ? " " + jenis : "");
 }
 
-function tampilkanPesanEditProduk(teks, produk) {
-  const pesan = document.getElementById("pesan");
-  pesan.replaceChildren();
-  const label = document.createElement("span");
-  label.textContent = teks;
-  const tombol = document.createElement("button");
-  tombol.type = "button";
-  tombol.className = "notice-action";
-  tombol.dataset.editQuick = produk.kode;
-  tombol.textContent = "Edit produk";
-  pesan.append(label, tombol);
-  pesan.className = "notice success notice-with-action";
-}
-
 function aturGambarProduk(img, gambar, namaProduk) {
   const punyaFoto = Boolean(gambar);
   img.dataset.placeholder = String(!punyaFoto);
@@ -547,7 +533,7 @@ function prosesBarcode(barcode) {
     return;
   }
   KasirLogic.tambahItem(keranjang, produk.kode);
-  tampilkanPesanEditProduk(`${produk.nama} ditambahkan · ${rupiah(produk.harga)} · stok ${Math.max(0, Number(produk.stock || 0) - (keranjang.find((item) => item.kode === produk.kode)?.qty || 0))}.`, produk);
+  tampilkanPesan("");
   render();
 }
 
@@ -651,17 +637,11 @@ elProduk.addEventListener("click", (event) => {
       throw new Error(`Jumlah ${produk.nama} sudah mencapai stok tersedia`);
     }
     KasirLogic.tambahItem(keranjang, tombol.dataset.kode);
-    const terpilih = KasirLogic.cariProduk(tombol.dataset.kode);
-    tampilkanPesanEditProduk(`${terpilih.nama} ditambahkan · ${rupiah(terpilih.harga)} · stok ${Math.max(0, Number(terpilih.stock || 0) - (keranjang.find((item) => item.kode === terpilih.kode)?.qty || 0))}.`, terpilih);
+    tampilkanPesan("");
     render();
   } catch (error) {
     tampilkanPesan(error.message, "error");
   }
-});
-
-document.getElementById("pesan").addEventListener("click", (event) => {
-  const button = event.target.closest("[data-edit-quick]");
-  if (button) bukaDialogProduk(button.dataset.editQuick);
 });
 
 elKeranjang.addEventListener("click", (event) => {

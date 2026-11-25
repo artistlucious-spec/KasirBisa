@@ -899,7 +899,7 @@ button, input, select { font-family: inherit; }
   .header-nav .logout-button { grid-column: 1 / -1; color: #b42318; }
   main { padding: 16px 13px 30px; }
   .transaction-section { padding: 0; }
-  .transaction-heading { align-items: flex-start; gap: 12px; margin: 3px 1px 14px; }
+  .transaction-heading { align-items: flex-start; gap: 12px; margin: 3px 1px 14px; padding: 4px 12px 0; }
   .transaction-heading h1 { font-size: 23px; letter-spacing: -.035em; }
   .transaction-heading .eyebrow { margin-bottom: 4px; }
   .sales-stats { width: 100%; padding: 11px 13px; gap: 12px; border: 1px solid var(--line); border-radius: 13px; background: #fff; }
@@ -1022,8 +1022,6 @@ dialog::backdrop { background:rgba(15,35,60,.48); backdrop-filter:blur(3px); }
 .form-dialog .product-form-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .form-dialog .product-form-grid label { font-size:12px; }
 .form-dialog .product-form-grid input { width:100%; min-width:0; min-height:44px; }
-.notice-with-action { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:9px 0; }
-.notice-action { padding:7px 11px; border:1px solid #b9d5f2; border-radius:9px; background:#fff; color:var(--green-dark); cursor:pointer; font-size:12px; font-weight:750; }
 .scanner-disclosure > summary { display:flex; align-items:center; gap:12px; min-height:68px; padding:12px 15px; border:1px solid var(--line); border-radius:14px; background:#fff; box-shadow:var(--shadow); cursor:pointer; list-style:none; }
 .scanner-disclosure > summary::-webkit-details-marker { display:none; }
 .scanner-summary-icon { display:grid; width:40px; height:40px; flex:0 0 40px; place-items:center; border-radius:12px; background:var(--green-light); color:var(--green); font-size:22px; }
