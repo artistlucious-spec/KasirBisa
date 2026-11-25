@@ -98,9 +98,15 @@ function renderProduk() {
 
   for (const produk of daftar) {
     const kartu = elemen("article", "product-card");
+    const areaGambar = elemen("div", "product-image-wrap");
     const gambar = document.createElement("img");
     gambar.loading = "lazy";
     aturGambarProduk(gambar, produk.gambar, produk.nama);
+    const jumlahDiKeranjang = keranjang.find((item) => item.kode === produk.kode)?.qty || 0;
+    const badgeJumlah = elemen("span", "product-cart-count", String(jumlahDiKeranjang));
+    badgeJumlah.hidden = jumlahDiKeranjang === 0;
+    badgeJumlah.setAttribute("aria-label", `${jumlahDiKeranjang} ${produk.nama} di keranjang`);
+    areaGambar.append(gambar, badgeJumlah);
 
     const info = elemen("div", "product-info");
     info.append(
@@ -113,7 +119,7 @@ function renderProduk() {
     tambah.type = "button";
     tambah.dataset.kode = produk.kode;
     tambah.setAttribute("aria-label", `Tambah ${produk.nama} ke keranjang`);
-    kartu.append(gambar, info, tambah);
+    kartu.append(areaGambar, info, tambah);
     elProduk.appendChild(kartu);
   }
 }
