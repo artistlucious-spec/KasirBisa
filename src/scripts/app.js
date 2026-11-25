@@ -233,7 +233,7 @@ function renderPembayaran() {
     valid && !isQris ? rupiah(dibayar - total) : rupiah(0);
   document.getElementById("tombol-bayar").disabled =
     Boolean(pesanKesalahanPenyimpanan) || keranjang.length === 0 || !valid;
-  document.getElementById("tombol-bayar").textContent = isQris ? "Tampilkan QR" : "Bayar";
+  document.getElementById("tombol-bayar").textContent = isQris ? "Lanjut ke konfirmasi" : "Bayar";
   renderNominalCepat(total);
 }
 
@@ -562,10 +562,6 @@ function ajukanPembayaran() {
     isiRincian(document.getElementById("ringkasan-konfirmasi"), transaksiMenunggu);
     const konfirmasiQris = document.getElementById("konfirmasi-qris");
     konfirmasiQris.hidden = metodePembayaran !== "qris";
-    if (metodePembayaran === "qris") {
-      document.getElementById("gambar-qris-dialog").src = qrSelected.image;
-      document.getElementById("gambar-qris-dialog").alt = `QR ${qrSelected.name} untuk dipindai pelanggan`;
-    }
     document.getElementById("konfirmasi-pembayaran").textContent =
       metodePembayaran === "qris" ? "Pembayaran diterima & simpan" : "Konfirmasi & bayar";
     document.getElementById("langkah-konfirmasi").hidden = false;
