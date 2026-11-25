@@ -159,6 +159,21 @@ function renderRecommendations(items) {
     article.append(head, evidence, action, reason); target.append(article);
   }
 }
+function formatStockRiskDetail(risks) {
+  if (!Array.isArray(risks) || !risks.length) {
+    return "Belum ada produk berisiko berdasarkan penjualan 7 hari terakhir.";
+  }
+  const examples = risks.slice(0, 2).map((item) => {
+    const stock = Number(item.stok || 0);
+    const sold = Number(item.terjual_7_hari || 0);
+    const status = stock === 0
+      ? "stok habis"
+      : `stok ${stock}, perkiraan cukup ${item.hari_tersisa} hari`;
+    return `${item.nama}: ${status}; terjual ${sold} unit/7 hari`;
+  });
+  const remaining = risks.length - examples.length;
+  return `Perlu diperiksa: ${examples.join(" · ")}${remaining > 0 ? ` · dan ${remaining} produk lainnya` : ""}`;
+}
 async function generateInsight() {
   button.disabled = true; button.textContent = "Menganalisis data..."; keyArea.hidden = true;
   setNotice("Membaca transaksi, pergerakan produk, dan kondisi stok...");
@@ -189,6 +204,12 @@ async function generateInsight() {
       const title = document.createElement("span"); title.textContent = card.judul || "Ringkasan";
       const value = document.createElement("strong"); value.textContent = card.isi || "-";
       article.append(title, value); grid.append(article);
+      if (card.judul === "Risiko stok") {
+        const detail = document.createElement("small");
+        detail.className = "insight-mini-card-detail";
+        detail.textContent = formatStockRiskDetail(data.facts?.risiko_stok);
+        article.append(detail);
+      }
     }
     const facts = data.facts || {};
     renderSalesComparison(facts);

@@ -701,6 +701,7 @@ a.primary-button { display: inline-flex; align-items: center; justify-content: c
 }
 .insight-mini-card span { color: var(--muted); font-size: 12px; }
 .insight-mini-card strong { font-size: 17px; }
+.insight-mini-card-detail { color: var(--muted); font-size: 11px; line-height: 1.45; }
 .insight-mini-card.warning { border-left: 4px solid #e6a700; }
 .insight-mini-card.success { border-left: 4px solid #25895d; }
 .insight-mini-card.info { border-left: 4px solid var(--green); }
