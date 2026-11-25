@@ -55,6 +55,11 @@ function niceAxisTicks(maxValue) {
   return Array.from({ length: count + 1 }, (_, index) => Math.max(0, top - step * index));
 }
 
+function productAxisTicks(maxValue) {
+  if (maxValue <= 100) return [100, 80, 60, 40, 20, 0];
+  return niceAxisTicks(maxValue);
+}
+
 function wrapLabel(value, maxLength = 14) {
   const words = String(value).trim().split(/\s+/);
   const lines = [""];
@@ -87,13 +92,15 @@ function renderBarChart(target, entries, type) {
   const axisLeft = 92;
   const rightMargin = 24;
   const categoryWidth = isProducts ? 104 : 78;
-  const width = Math.max(target.clientWidth, 560, axisLeft + rightMargin + categoryWidth * entries.length);
-  const height = isProducts ? 274 : 250;
-  const plotTop = isProducts ? 58 : 24;
-  const plotHeight = isProducts ? 135 : 145;
+  const contentWidth = axisLeft + rightMargin + categoryWidth * entries.length;
+  const width = Math.max(target.clientWidth, 560, contentWidth);
+  const height = isProducts ? 294 : 250;
+  const plotTop = 24;
+  const plotHeight = 145;
   const baseline = plotTop + plotHeight;
   const plotWidth = width - axisLeft - rightMargin;
-  const ticks = niceAxisTicks(Math.max(...entries.map((entry) => entry.value)));
+  const maxValue = Math.max(...entries.map((entry) => entry.value));
+  const ticks = isProducts ? productAxisTicks(maxValue) : niceAxisTicks(maxValue);
   const scaleMax = ticks[0];
   const svg = createSvgElement("svg", {
     class: "report-svg-chart",
@@ -179,7 +186,7 @@ function renderBarChart(target, entries, type) {
   yAxisTitle.textContent = isProducts ? "Unit terjual" : "Penjualan (Rp)";
   svg.append(yAxisTitle);
 
-  const slotWidth = plotWidth / entries.length;
+  const slotWidth = categoryWidth;
   const barWidth = Math.min(isProducts ? 38 : 40, slotWidth * 0.48);
   entries.forEach((entry, index) => {
     const center = axisLeft + slotWidth * (index + 0.5);
@@ -202,7 +209,7 @@ function renderBarChart(target, entries, type) {
 
     const valueLabel = createSvgElement("text", {
       x: center,
-      y: Math.max(plotTop + 10, barY - 7),
+      y: Math.max(12, barY - 7),
       class: "report-chart-value",
       "text-anchor": "middle",
     });
@@ -223,7 +230,7 @@ function renderBarChart(target, entries, type) {
       const imageSource = productsByCode.get(entry.code)?.gambar || placeholderImage;
       const image = createSvgElement("image", {
         x: center - 15,
-        y: 10,
+        y: baseline + 10,
         width: 30,
         height: 30,
         href: imageSource,
