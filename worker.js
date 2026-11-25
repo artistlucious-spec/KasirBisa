@@ -1677,6 +1677,59 @@ function buildInsightRecommendations(facts, focus) {
   return recommendations.slice(0, 8);
 }
 
+function buildInsightSummary(facts, focus) {
+  const soldAmount = rupiah(facts.penjualan_7_hari);
+  const transactionCount = Number(facts.transaksi_7_hari || 0);
+  const salesPrefix = `Dalam 7 hari terakhir tercatat ${transactionCount} transaksi dengan penjualan ${soldAmount}.`;
+
+  if (focus === "sales") {
+    const trend = facts.tren_penjualan;
+    if (trend.status === "naik" || trend.status === "turun" || trend.status === "stabil") {
+      return `Fokus peningkatan penjualan: ${trend.keterangan} Periksa rekomendasi untuk melihat langkah yang dapat dipertimbangkan.`;
+    }
+    return `Fokus peningkatan penjualan: ${salesPrefix} ${trend.keterangan}`;
+  }
+
+  if (focus === "stock") {
+    const risks = facts.risiko_stok || [];
+    if (!risks.length) {
+      return `Fokus pengelolaan stok: ${salesPrefix} Belum ada produk yang terdeteksi berisiko habis berdasarkan stok dan penjualan 7 hari terakhir.`;
+    }
+    const products = risks.slice(0, 3).map((item) =>
+      `${item.nama} (stok ${item.stok}, terjual ${item.terjual_7_hari} unit)`
+    ).join(", ");
+    return `Fokus pengelolaan stok: ${risks.length} produk perlu diperiksa berdasarkan penjualan 7 hari terakhir, termasuk ${products}.`;
+  }
+
+  if (focus === "best_sellers") {
+    const products = facts.produk_terlaris_7_hari || [];
+    if (!products.length) {
+      return `Fokus produk terlaris: belum ada produk yang tercatat terjual dalam 7 hari terakhir. ${salesPrefix}`;
+    }
+    const topProducts = products.slice(0, 3)
+      .map((item) => `${item.nama} (${item.qty} unit)`)
+      .join(", ");
+    return `Fokus produk terlaris: dalam 7 hari terakhir produk dengan penjualan tertinggi adalah ${topProducts}.`;
+  }
+
+  if (focus === "slow_movers") {
+    if (Number(facts.periode_data_hari || 0) < 30) {
+      return `Fokus produk kurang laku: data transaksi belum mencakup 30 hari, jadi sistem belum dapat menilai produk yang tidak terjual selama 30 hari. ${salesPrefix}`;
+    }
+    const products = facts.produk_tidak_bergerak || [];
+    if (!products.length) {
+      return `Fokus produk kurang laku: tidak ditemukan produk dengan stok tersisa yang tanpa penjualan selama 30 hari terakhir.`;
+    }
+    const names = products.slice(0, 3).map((item) => `${item.nama} (stok ${item.stok})`).join(", ");
+    return `Fokus produk kurang laku: ${products.length} produk masih memiliki stok tetapi tidak tercatat terjual dalam 30 hari terakhir, termasuk ${names}.`;
+  }
+
+  if (!facts.jumlah_transaksi) {
+    return "Belum ada transaksi yang cukup untuk menyimpulkan pola penjualan. Mulai catat transaksi agar analisis dapat terbentuk.";
+  }
+  return `${salesPrefix} ${facts.tren_penjualan.keterangan}`;
+}
+
 async function smartInsightApi(request, env, businessId) {
   // Satu JOIN mengambil transaksi dan item sekaligus; seluruh data dibatasi pada business_id sesi.
   const body = await parseJsonBody(request) || {};
@@ -1801,9 +1854,7 @@ async function smartInsightApi(request, env, businessId) {
   };
   const recommendations = buildInsightRecommendations(facts, focus);
   const fallback = {
-    ringkasan: txMap.size
-      ? `${count7} transaksi tercatat dalam 7 hari terakhir dengan penjualan ${rupiah(total7)}. ${trend.keterangan}`
-      : "Belum ada transaksi yang cukup untuk menyimpulkan pola penjualan. Mulai catat transaksi agar analisis dapat terbentuk.",
+    ringkasan: buildInsightSummary(facts, focus),
     produk_terlaris: top7.length ? `${top7[0].nama} terjual ${top7[0].qty} unit dalam 7 hari terakhir.` : "Belum ada penjualan produk dalam 7 hari terakhir.",
     stok_menipis: risikoStok.length ? risikoStok.slice(0, 3).map((item) => `${item.nama}: stok ${item.stok}, terjual ${item.terjual_7_hari} unit/7 hari`).join("; ") : "Belum ditemukan risiko stok berdasarkan laju penjualan 7 hari terakhir.",
     jam_ramai: facts.catatan_jam_ramai,
