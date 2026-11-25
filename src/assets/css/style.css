@@ -188,7 +188,20 @@ main { width: min(1280px, 100%); margin: 0 auto; padding: 28px 24px 52px; }
   cursor: pointer;
   font-weight: 700;
 }
-.add-button { min-height: 36px; margin: 0 10px 10px; font-size: 12px; }
+.product-card-actions { display: grid; gap: 6px; margin: 0 10px 10px; }
+.add-button { min-height: 36px; margin: 0; font-size: 12px; }
+.decrease-button {
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid #d6dde6;
+  border-radius: 11px;
+  background: #f2f4f7;
+  color: #475467;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+}
+.decrease-button:hover { background: #e8ebf0; }
 .add-button:hover, .primary-button:hover:not(:disabled) { background: var(--green-dark); }
 .empty-products { grid-column: 1 / -1; padding: 30px 12px; color: var(--muted); text-align: center; }
 
@@ -799,7 +812,8 @@ dialog h2 { margin: 0 0 18px; font-size: 20px; }
   .product-image-wrap > img { height: 100px; }
   .product-info { padding: 9px 9px 7px; }
   .product-info h3 { min-height: 32px; font-size: 12px; }
-  .add-button { min-height: 42px; margin: 0 8px 8px; font-size: 12px; }
+  .product-card-actions { margin: 0 8px 8px; }
+  .add-button { min-height: 42px; margin: 0; font-size: 12px; }
   .product-actions button { min-height: 40px; }
   .product-filters { grid-template-columns: minmax(0, 1fr) 120px; gap: 7px; margin: 13px 0; }
   .product-filters input, .product-filters select { min-width: 0; font-size: 13px; }
@@ -920,7 +934,8 @@ button, input, select { font-family: inherit; }
   .product-category { font-size: 10px; }
   .product-info h3 { min-height: 34px; font-size: 13px; line-height: 1.35; }
   .product-price { font-size: 13px; }
-  .add-button { min-height: 42px; margin: 0 8px 8px; border-radius: 10px; font-size: 12px; }
+  .product-card-actions { margin: 0 8px 8px; }
+  .add-button { min-height: 42px; margin: 0; border-radius: 10px; font-size: 12px; }
   .mobile-cart-trigger {
     left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom));
     min-height: 62px; padding: 10px 14px; border-radius: 16px;
