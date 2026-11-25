@@ -1083,9 +1083,14 @@ async function paymentSettingsApi(request, env, businessId) {
       ).bind(businessId, name).first(),
     ]);
     if (Number(count?.total) >= MAX_QRIS_COUNT_PER_BUSINESS) {
-      return json({ error: `Maksimal ${MAX_QRIS_COUNT_PER_BUSINESS} QRIS per usaha.` }, 409);
+      return json({
+        code: "QR_LIMIT_REACHED",
+        error: `Usaha ini sudah menyimpan ${MAX_QRIS_COUNT_PER_BUSINESS} QRIS. Hapus salah satu untuk menambahkan QR baru.`,
+      }, 409);
     }
-    if (duplicate) return json({ error: "Nama QRIS sudah digunakan. Pilih nama lain." }, 409);
+    if (duplicate) {
+      return json({ code: "QR_NAME_EXISTS", error: "Nama ini sudah digunakan pada usaha ini. QR dengan nama yang sama tetap boleh digunakan oleh usaha lain." }, 409);
+    }
     const id = `QR-${crypto.randomUUID()}`;
     await env.DB.prepare(
       `INSERT INTO business_payment_qrs
