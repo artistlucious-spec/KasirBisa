@@ -115,11 +115,21 @@ function renderProduk() {
       elemen("strong", "product-price", rupiah(produk.harga)),
       elemen("span", "stock-badge", `Stok ${produk.stock ?? 0} · ${produk.barcode || "-"}`)
     );
+    const aksi = elemen("div", "product-card-actions");
     const tambah = elemen("button", "add-button", "Tambah");
     tambah.type = "button";
     tambah.dataset.kode = produk.kode;
     tambah.setAttribute("aria-label", `Tambah ${produk.nama} ke keranjang`);
-    kartu.append(areaGambar, info, tambah);
+    aksi.appendChild(tambah);
+    if (jumlahDiKeranjang > 0) {
+      const kurang = elemen("button", "decrease-button", "Kurangi");
+      kurang.type = "button";
+      kurang.dataset.kode = produk.kode;
+      kurang.dataset.action = "decrease";
+      kurang.setAttribute("aria-label", `Kurangi satu ${produk.nama} dari keranjang`);
+      aksi.appendChild(kurang);
+    }
+    kartu.append(areaGambar, info, aksi);
     elProduk.appendChild(kartu);
   }
 }
@@ -619,6 +629,18 @@ elProduk.addEventListener("click", (event) => {
   const tombol = event.target.closest("[data-kode]");
   if (!tombol) return;
   try {
+    if (tombol.dataset.action === "decrease") {
+      const item = keranjang.find((produk) => produk.kode === tombol.dataset.kode);
+      if (!item) throw new Error("Produk tidak ditemukan di keranjang");
+      if (item.qty === 1) {
+        keranjang = KasirLogic.hapusItem(keranjang, tombol.dataset.kode);
+      } else {
+        KasirLogic.ubahJumlah(keranjang, tombol.dataset.kode, item.qty - 1);
+      }
+      render();
+      return;
+    }
+
     const produk = KasirLogic.cariProduk(tombol.dataset.kode);
     if ((produk.stock ?? 0) <= 0) throw new Error(`Stok ${produk.nama} habis`);
     const itemAda = keranjang.find((item) => item.kode === produk.kode);
