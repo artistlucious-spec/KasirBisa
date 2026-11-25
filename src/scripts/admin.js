@@ -2,6 +2,7 @@ const statusMessage = document.getElementById("admin-status");
 const dashboard = document.getElementById("admin-dashboard");
 const pageSize = 50;
 const moneyFormatter = new Intl.NumberFormat("id-ID");
+const paymentQrLabel = (label) => !label || label === "QRIS" ? "QR" : label;
 
 const states = {
   accounts: { items: [], offset: 0, total: 0, query: "", loading: false, loaded: false, timer: null },
@@ -197,7 +198,7 @@ function renderTransactions() {
       <td>${escapeHtml(item.businessName)}<small class="admin-cell-subtitle">@${escapeHtml(item.username)}</small></td>
       <td class="admin-id-cell">${escapeHtml(item.id)}</td>
       <td>${Number(item.itemCount) || 0}</td>
-      <td>${escapeHtml(item.paymentMethod === "qris" ? (item.paymentLabel || "QRIS") : "Tunai")}</td>
+      <td>${escapeHtml(item.paymentMethod === "qris" ? paymentQrLabel(item.paymentLabel) : "Tunai")}</td>
       <td>${money(item.total)}</td>
       <td><button class="secondary-button admin-account-action" type="button" data-transaction-detail="${index}">Lihat</button></td>
     </tr>`).join("");
@@ -414,7 +415,7 @@ async function showTransaction(index) {
     content.innerHTML = `
       <p><strong>Usaha:</strong> ${escapeHtml(detail.business_name)} (@${escapeHtml(detail.username)})</p>
       <p><strong>Waktu:</strong> ${escapeHtml(formatDate(detail.waktu, true))}</p>
-      <p><strong>Metode:</strong> ${escapeHtml(detail.paymentMethod === "qris" ? (detail.paymentLabel || "QRIS") : "Tunai")} · <strong>Member:</strong> ${detail.member ? "Ya" : "Tidak"}</p>
+      <p><strong>Metode:</strong> ${escapeHtml(detail.paymentMethod === "qris" ? paymentQrLabel(detail.paymentLabel) : "Tunai")} · <strong>Member:</strong> ${detail.member ? "Ya" : "Tidak"}</p>
       <div class="admin-table-scroll"><table class="admin-table admin-detail-table">
         <thead><tr><th>Produk</th><th>Jumlah</th><th>Harga</th><th>Subtotal</th></tr></thead>
         <tbody>${detail.items.map((product) => `<tr><td>${escapeHtml(product.name)}<small class="admin-cell-subtitle">${escapeHtml(product.code)}</small></td><td>${Number(product.qty)}</td><td>${money(product.price)}</td><td>${money(product.price * product.qty)}</td></tr>`).join("")}</tbody>
@@ -444,7 +445,7 @@ async function showPaymentQr(index) {
     const detail = await requestJson(`/api/admin/data?${params}`);
     content.replaceChildren();
     if (!Array.isArray(detail.qrs) || !detail.qrs.length) {
-      content.textContent = "Usaha ini belum menyimpan QRIS.";
+      content.textContent = "Usaha ini belum menyimpan QR.";
       return;
     }
     for (const qr of detail.qrs) {
@@ -454,13 +455,13 @@ async function showPaymentQr(index) {
       const entry = document.createElement("section");
       entry.className = "admin-qr-entry";
       const title = document.createElement("h3");
-      title.textContent = qr.name;
+      title.textContent = paymentQrLabel(qr.name);
       const status = document.createElement("p");
       status.textContent = qr.enabled ? "Aktif di kasir" : "Nonaktif";
       const image = document.createElement("img");
       image.className = "admin-qr-image";
       image.src = qr.image;
-      image.alt = `QRIS ${qr.name} milik ${detail.businessName}`;
+      image.alt = `QR ${paymentQrLabel(qr.name)} milik ${detail.businessName}`;
       entry.append(title, status, image);
       content.appendChild(entry);
     }
@@ -473,7 +474,7 @@ async function togglePayment(index, button) {
   const item = states.payments.items[index];
   if (!item) return;
   const nextEnabled = !item.qrisEnabled;
-  if (!window.confirm(`${nextEnabled ? "Aktifkan" : "Nonaktifkan"} semua QRIS untuk usaha ${item.businessName}?`)) return;
+  if (!window.confirm(`${nextEnabled ? "Aktifkan" : "Nonaktifkan"} semua QR untuk usaha ${item.businessName}?`)) return;
   button.disabled = true;
   try {
     await requestJson("/api/admin/data?resource=payments", {
@@ -482,10 +483,10 @@ async function togglePayment(index, button) {
       body: JSON.stringify({ businessId: item.businessId, qrisEnabled: nextEnabled }),
     });
     await loadResource("payments", true);
-    showStatus(`Semua QRIS berhasil ${nextEnabled ? "diaktifkan" : "dinonaktifkan"}.`);
+    showStatus(`Semua QR berhasil ${nextEnabled ? "diaktifkan" : "dinonaktifkan"}.`);
   } catch (error) {
     button.disabled = false;
-    showStatus(error.message || "Pengaturan QRIS tidak dapat diubah.", true);
+    showStatus(error.message || "Pengaturan QR tidak dapat diubah.", true);
   }
 }
 

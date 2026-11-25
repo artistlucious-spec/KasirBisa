@@ -27,7 +27,7 @@
       <a class="header-link" href="laporan.html">Laporan Penjualan</a>
       <a class="header-link" href="smart-insight.html">Smart Insight</a>
       <a class="header-link" href="pusat-perhatian.html">Pusat Perhatian Toko <span id="store-alert-badge" class="count-badge" hidden>0</span></a>
-      <a class="header-link" href="tanya-smart-insight.html">Tanya Smart Insight</a>
+      
       <a class="header-link" href="panduan.html">Panduan</a>
       <a class="header-link" href="profile.html">Profil Usaha</a>
       <button id="tombol-keluar" class="header-link logout-button" type="button">Keluar</button>
@@ -145,19 +145,19 @@
               </label>
               <label class="payment-method-option">
                 <input id="metode-qris" type="radio" name="metode-pembayaran" value="qris">
-                <span>QRIS <small id="status-pilihan-qris">Tambahkan QRIS toko terlebih dahulu</small></span>
+                <span>QR <small id="status-pilihan-qris">Tambahkan QR toko terlebih dahulu</small></span>
               </label>
             </fieldset>
             <label id="qris-selection-wrap" class="qris-selection-wrap" for="pilihan-qris" hidden>
-              <span>Pilih QRIS</span>
+              <span>Pilih QR</span>
               <select id="pilihan-qris"></select>
             </label>
             <div id="qris-management-links" class="qris-management-links" hidden>
-              <a id="link-tambah-qris" class="qris-settings-link" href="qr.html?add=1" data-preserve-cart>＋ Tambah QRIS</a>
-              <a id="link-lihat-qris" class="qris-settings-link" href="qr.html" data-preserve-cart>Lihat QRIS</a>
+              <a id="link-tambah-qris" class="qris-settings-link" href="qr.html?add=1" data-preserve-cart>＋ Tambah QR</a>
+              <a id="link-lihat-qris" class="qris-settings-link" href="qr.html" data-preserve-cart>Lihat QR</a>
             </div>
             <div id="panduan-qris-kasir" class="qris-checkout-guide" hidden>
-              <img id="gambar-qris-kasir" alt="QRIS toko untuk dipindai pelanggan">
+              <img id="gambar-qris-kasir" alt="QR toko untuk dipindai pelanggan">
               <p>Tampilkan QR ini ke pelanggan. Pastikan pembayaran sudah masuk di aplikasi Anda sebelum menekan konfirmasi.</p>
             </div>
             <form id="form-pembayaran" novalidate>
@@ -192,8 +192,8 @@
       <h2 id="judul-dialog">Konfirmasi pembayaran</h2>
       <div id="ringkasan-konfirmasi" class="dialog-summary"></div>
       <div id="konfirmasi-qris" class="qris-confirmation" hidden>
-        <img id="gambar-qris-dialog" alt="QRIS toko untuk dipindai pelanggan">
-        <p>Silakan cek aplikasi bank atau penyedia QRIS. Lanjutkan hanya setelah pembayaran sebesar total belanja benar-benar diterima.</p>
+        <img id="gambar-qris-dialog" alt="QR toko untuk dipindai pelanggan">
+        <p>Silakan cek pembayaran di aplikasi Anda. Lanjutkan hanya setelah pembayaran sebesar total belanja benar-benar diterima.</p>
       </div>
       <div class="dialog-actions">
         <button id="batal-konfirmasi" class="secondary-button" type="button">Kembali</button>
@@ -241,6 +241,7 @@
     </form>
   </dialog>
 
+  <div id="struk-cetak" aria-hidden="true"></div>
   <audio id="suara-transaksi-sukses" src="assets/sfx/buy.mp3" preload="auto"></audio>
   <!-- Urutan penting: logika domain dan utilitas gambar harus ada sebelum app.js. -->
   <script src="scripts/kasir.js"></script>

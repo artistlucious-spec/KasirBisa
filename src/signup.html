@@ -22,14 +22,16 @@
       <form id="form-signup">
         <label for="nama-usaha">Nama usaha</label>
         <input id="nama-usaha" name="businessName" type="text" autocomplete="organization" required maxlength="120">
+        <small class="login-field-help">Nama ini juga bisa dipakai saat masuk.</small>
         <label for="nama-pengguna">Nama pengguna</label>
         <input id="nama-pengguna" name="username" type="text" autocomplete="username" required maxlength="128">
         <label for="nomor-whatsapp">Nomor WhatsApp</label>
         <input id="nomor-whatsapp" name="whatsapp" type="tel" inputmode="tel" autocomplete="tel" required maxlength="24" placeholder="Contoh: 081234567890">
-        <label for="kata-sandi">Password (minimal 12 karakter)</label>
-        <input id="kata-sandi" name="password" type="password" autocomplete="new-password" required minlength="12" maxlength="256">
-        <label for="konfirmasi-kata-sandi">Ulangi password</label>
-        <input id="konfirmasi-kata-sandi" name="confirmPassword" type="password" autocomplete="new-password" required minlength="12" maxlength="256">
+        <small class="login-field-help">Nomor ini bisa dipakai untuk menerima kode masuk jika Anda lupa kata sandi.</small>
+        <label for="kata-sandi">Kata sandi (4–12 karakter)</label>
+        <input id="kata-sandi" name="password" type="password" autocomplete="new-password" required minlength="4" maxlength="12">
+        <label for="konfirmasi-kata-sandi">Ulangi kata sandi</label>
+        <input id="konfirmasi-kata-sandi" name="confirmPassword" type="password" autocomplete="new-password" required minlength="4" maxlength="12">
         <button id="tombol-daftar" class="primary-button" type="submit">Daftar dan mulai</button>
       </form>
       <p id="pesan-daftar" class="login-message" role="status" aria-live="polite"></p>

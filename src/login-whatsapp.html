@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1565c0">
+  <title>Masuk dengan WhatsApp - Kasir Bisa</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="icon" type="image/png" href="icon/Favicon.png">
+</head>
+<body class="halaman-login">
+  <main class="login-layout">
+    <section class="login-card" aria-labelledby="whatsapp-login-title">
+      <a class="brand login-brand" href="login.html" aria-label="Kasir Bisa">
+        <img class="brand-logo" src="icon/Favicon.png" alt="" aria-hidden="true">
+        <span><strong>Kasir Bisa</strong><small>Kasir kantin sederhana</small></span>
+      </a>
+      <p class="eyebrow">LUPA KATA SANDI?</p>
+      <h1 id="whatsapp-login-title">Masuk dengan WhatsApp</h1>
+      <p class="login-description">Kami kirim kode masuk ke nomor WhatsApp yang Anda daftarkan. Anda tidak perlu mengingat kata sandi.</p>
+      <form id="form-login-whatsapp">
+        <label for="nomor-whatsapp">Nomor WhatsApp yang terdaftar</label>
+        <input id="nomor-whatsapp" name="whatsapp" type="tel" inputmode="tel" autocomplete="tel" required maxlength="24" placeholder="Contoh: 081234567890">
+        <button id="kirim-kode-whatsapp" class="secondary-button" type="button">Kirim kode ke WhatsApp</button>
+        <div id="bagian-kode-whatsapp" hidden>
+          <label for="kode-whatsapp">Kode 6 angka</label>
+          <input id="kode-whatsapp" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
+          <small class="login-field-help">Kode berlaku 10 menit. Jangan berikan kode ini kepada orang lain.</small>
+          <button id="masuk-dengan-kode" class="primary-button" type="submit">Masuk dengan kode</button>
+        </div>
+      </form>
+      <p id="pesan-login-whatsapp" class="login-message" role="status" aria-live="polite"></p>
+      <p class="login-help">Kembali ke <a href="login.html">masuk dengan kata sandi</a>.</p>
+    </section>
+  </main>
+  <script src="scripts/login-whatsapp.js"></script>
+</body>
+</html>

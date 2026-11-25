@@ -21,6 +21,10 @@ function rupiah(angka) {
   return "Rp" + Number(angka).toLocaleString("id-ID");
 }
 
+function namaQrTampilan(nama) {
+  return nama === "QRIS" ? "QR" : nama;
+}
+
 function elemen(tag, className, teks) {
   const hasil = document.createElement(tag);
   if (className) hasil.className = className;
@@ -200,14 +204,14 @@ function renderPembayaran() {
   const qrActives = (pengaturanPembayaran.paymentQrs || []).filter((qr) => qr.enabled);
   const qrSelected = qrActives.find((qr) => qr.id === pilihanQr.value) || qrActives[0] || null;
   const qrisReady = Boolean(qrSelected?.image);
-  pilihanQr.replaceChildren(...qrActives.map((qr) => new Option(qr.name, qr.id)));
+  const isQris = pilihanQris.checked;
+  pilihanQr.replaceChildren(...qrActives.map((qr) => new Option(namaQrTampilan(qr.name), qr.id)));
   if (qrSelected) pilihanQr.value = qrSelected.id;
-  document.getElementById("qris-selection-wrap").hidden = !qrActives.length;
+  document.getElementById("qris-selection-wrap").hidden = !isQris || !qrActives.length;
   pilihanQr.disabled = !qrActives.length;
   pilihanQris.disabled = false;
   document.getElementById("status-pilihan-qris").textContent =
-    qrisReady ? "Periksa pembayaran secara manual" : "Tambahkan QRIS toko terlebih dahulu";
-  const isQris = pilihanQris.checked;
+    qrisReady ? "Periksa pembayaran secara manual" : "Tambahkan QR toko terlebih dahulu";
   document.getElementById("qris-management-links").hidden = !isQris;
   const dibayar = isQris ? total : elBayar.value.trim() === "" ? NaN : Number(elBayar.value);
   const valid = isQris
@@ -221,7 +225,7 @@ function renderPembayaran() {
   const qrisImage = document.getElementById("gambar-qris-kasir");
   if (qrSelected) {
     qrisImage.src = qrSelected.image;
-    qrisImage.alt = `QRIS ${qrSelected.name} untuk dipindai pelanggan`;
+    qrisImage.alt = `QR ${qrSelected.name} untuk dipindai pelanggan`;
   } else {
     qrisImage.removeAttribute("src");
   }
@@ -269,7 +273,7 @@ function isiRincian(target, transaksi) {
   addTotal("Total", transaksi.total, true);
   const payment = elemen("div", "receipt-totals receipt-payment");
   const payLine = (label, value) => { const line = elemen("div", "receipt-total"); line.append(elemen("span", "", label), elemen("strong", "", rupiah(value))); payment.append(line); };
-  payLine(transaksi.metodePembayaran === "qris" ? (transaksi.labelPembayaran || "QRIS") : "Tunai", transaksi.dibayar);
+  payLine(transaksi.metodePembayaran === "qris" ? namaQrTampilan(transaksi.labelPembayaran || "QR") : "Tunai", transaksi.dibayar);
   if (transaksi.metodePembayaran !== "qris") payLine("Kembalian", transaksi.kembalian);
   const footer = elemen("div", "receipt-footer"); footer.append(elemen("strong", "", "Terima kasih atas kunjungan Anda!"), elemen("small", "", "Semoga hari Anda menyenangkan."));
   card.append(header, divider(), meta, divider(), elemen("h3", "receipt-items-title", "Rincian belanja"), items, divider(), totals, payment, divider(), footer);
@@ -309,7 +313,7 @@ function buatCanvasStruk(transaksi) {
   const total = (label, value, bold = false) => { addText(label, padding, y, `${bold ? "bold " : ""}20px Arial`, bold ? "#14243a" : "#667085"); addText(formatReceiptAmount(value), width-padding, y, `${bold ? "bold " : ""}${bold ? 27 : 20}px Arial`, bold ? "#1769c2" : "#182433", "right"); y += bold ? 42 : 32; };
   total("Subtotal", transaksi.subtotal); if (Number(transaksi.diskon || 0)) total("Diskon", -Number(transaksi.diskon));
   if (Number(transaksi.ppn || 0)) total("PPN", transaksi.ppn); total("TOTAL", transaksi.total, true);
-  y += 8; total(transaksi.metodePembayaran === "qris" ? (transaksi.labelPembayaran || "QRIS") : "Tunai", transaksi.dibayar);
+  y += 8; total(transaksi.metodePembayaran === "qris" ? namaQrTampilan(transaksi.labelPembayaran || "QR") : "Tunai", transaksi.dibayar);
   if (transaksi.metodePembayaran !== "qris") total("Kembalian", transaksi.kembalian);
   y += 14; addRule();
   addText("Terima kasih atas kunjungan Anda!", width/2, y, "bold 21px Arial", "#14243a", "center"); y += 30;
@@ -370,7 +374,7 @@ async function muatPengaturanPembayaran() {
     pengaturanPembayaran = await requestApi("/api/payment-settings");
     renderPembayaran();
   } catch (error) {
-    tampilkanPesan(`Pengaturan QRIS tidak dapat dimuat: ${error.message}`, "error");
+    tampilkanPesan(`Pengaturan QR tidak dapat dimuat: ${error.message}`, "error");
     renderPembayaran();
   }
 }
@@ -545,7 +549,7 @@ function ajukanPembayaran() {
       qr.id === document.getElementById("pilihan-qris").value && qr.enabled && qr.image
     );
     if (metodePembayaran === "qris" && !qrSelected) {
-      throw new Error("Pilih QRIS toko yang aktif terlebih dahulu.");
+      throw new Error("Pilih QR toko yang aktif terlebih dahulu.");
     }
     transaksiMenunggu = KasirLogic.buatTransaksi(
       keranjang,
@@ -560,7 +564,7 @@ function ajukanPembayaran() {
     konfirmasiQris.hidden = metodePembayaran !== "qris";
     if (metodePembayaran === "qris") {
       document.getElementById("gambar-qris-dialog").src = qrSelected.image;
-      document.getElementById("gambar-qris-dialog").alt = `QRIS ${qrSelected.name} untuk dipindai pelanggan`;
+      document.getElementById("gambar-qris-dialog").alt = `QR ${qrSelected.name} untuk dipindai pelanggan`;
     }
     document.getElementById("konfirmasi-pembayaran").textContent =
       metodePembayaran === "qris" ? "Pembayaran diterima & simpan" : "Konfirmasi & bayar";
@@ -685,7 +689,7 @@ document.querySelectorAll("[data-preserve-cart]").forEach((link) => {
         JSON.stringify(keranjang.map(({ kode, qty }) => ({ kode, qty })))
       );
     } catch {
-      tampilkanPesan("Keranjang tidak dapat disimpan sementara sebelum membuka pengaturan QRIS.", "error");
+      tampilkanPesan("Keranjang tidak dapat disimpan sementara sebelum membuka pengaturan QR.", "error");
     }
   });
 });
@@ -717,7 +721,17 @@ document.getElementById("batal-konfirmasi").addEventListener("click", () => {
 document.getElementById("tutup-struk").addEventListener("click", () => elDialog.close());
 document.getElementById("simpan-struk").addEventListener("click", simpanStruk);
 document.getElementById("bagikan-struk").addEventListener("click", bagikanStruk);
-document.getElementById("cetak-struk").addEventListener("click", () => window.print());
+document.getElementById("cetak-struk").addEventListener("click", () => {
+  const receipt = document.querySelector("#rincian-struk .receipt-paper");
+  if (!transaksiUntukStruk || !receipt) {
+    tampilkanPesan("Rincian struk belum siap dicetak.", "error");
+    return;
+  }
+  const printArea = document.getElementById("struk-cetak");
+  printArea.replaceChildren(receipt.cloneNode(true));
+  window.addEventListener("afterprint", () => printArea.replaceChildren(), { once: true });
+  window.print();
+});
 document.getElementById("kosongkan-keranjang").addEventListener("click", () => {
   keranjang = [];
   elBayar.value = "";

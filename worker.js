@@ -5,6 +5,9 @@ const MAX_QRIS_COUNT_PER_BUSINESS = 10;
 const AUTH_COOKIE_NAME = "kasir_bisa_session";
 const AUTH_SESSION_SECONDS = 12 * 60 * 60;
 const PASSWORD_HASH_ITERATIONS = 100_000;
+const WHATSAPP_LOGIN_CODE_SECONDS = 10 * 60;
+const WHATSAPP_LOGIN_MAX_ATTEMPTS = 5;
+const WHATSAPP_LOGIN_RATE_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_SETUP_MESSAGE = "Autentikasi belum siap. Administrator perlu mengatur AUTH_SESSION_SECRET dan menerapkan migrasi D1 terbaru.";
 const textEncoder = new TextEncoder();
 const USER_SELECT = `SELECT
@@ -261,6 +264,79 @@ async function parseJsonBody(request) {
   }
 }
 
+function whatsappLoginConfigured(env) {
+  return typeof env.WHATSAPP_ACCESS_TOKEN === "string"
+    && env.WHATSAPP_ACCESS_TOKEN.length > 0
+    && typeof env.WHATSAPP_PHONE_NUMBER_ID === "string"
+    && /^\d+$/.test(env.WHATSAPP_PHONE_NUMBER_ID)
+    && typeof env.WHATSAPP_API_VERSION === "string"
+    && /^v\d+\.\d+$/.test(env.WHATSAPP_API_VERSION)
+    && typeof env.WHATSAPP_LOGIN_TEMPLATE_NAME === "string"
+    && /^[a-z0-9_]+$/.test(env.WHATSAPP_LOGIN_TEMPLATE_NAME)
+    && typeof env.WHATSAPP_LOGIN_TEMPLATE_LANGUAGE === "string"
+    && /^[a-zA-Z]{2,3}(?:_[a-zA-Z]{2,4})?$/.test(env.WHATSAPP_LOGIN_TEMPLATE_LANGUAGE);
+}
+
+async function hmacBytes(secret, value) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    textEncoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  return new Uint8Array(await crypto.subtle.sign("HMAC", key, textEncoder.encode(value)));
+}
+
+async function createWhatsAppLoginCodeHash(secret, challengeId, whatsapp, code) {
+  return bytesToBase64Url(await hmacBytes(secret, `whatsapp-login:${challengeId}:${whatsapp}:${code}`));
+}
+
+async function sendWhatsAppLoginCode(env, whatsapp, code) {
+  const recipient = whatsapp.startsWith("0") ? `62${whatsapp.slice(1)}` : whatsapp;
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/${env.WHATSAPP_API_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: recipient,
+          type: "template",
+          template: {
+            name: env.WHATSAPP_LOGIN_TEMPLATE_NAME,
+            language: { code: env.WHATSAPP_LOGIN_TEMPLATE_LANGUAGE },
+            components: [
+              {
+                type: "body",
+                parameters: [{ type: "text", text: code }],
+              },
+              {
+                type: "button",
+                sub_type: "url",
+                index: "0",
+                parameters: [{ type: "text", text: code }],
+              },
+            ],
+          },
+        }),
+      }
+    );
+    if (!response.ok) {
+      console.error("[WHATSAPP LOGIN CODE DELIVERY FAILED]", { status: response.status });
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("[WHATSAPP LOGIN CODE DELIVERY FAILED]", { message: error?.message || String(error) });
+    return false;
+  }
+}
+
 async function authApi(request, env, pathname) {
   // Satu handler menangani seluruh URL /api/auth/* setelah pemeriksaan origin.
   const origin = request.headers.get("Origin");
@@ -272,6 +348,131 @@ async function authApi(request, env, pathname) {
     return json({ success: true }, 200, {
       "Set-Cookie": `${AUTH_COOKIE_NAME}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${new URL(request.url).protocol === "https:" ? "; Secure" : ""}`,
     });
+  }
+
+  if (pathname === "/api/auth/whatsapp-login/request" && request.method === "POST") {
+    if (!sessionSecretConfigured(env)) return json({ error: AUTH_SETUP_MESSAGE }, 503);
+    if (!whatsappLoginConfigured(env)) {
+      return json({ error: "Masuk dengan kode WhatsApp belum aktif. Gunakan kata sandi atau hubungi pengelola." }, 503);
+    }
+    const body = await parseJsonBody(request);
+    if (!body) return json({ error: "Nomor WhatsApp tidak valid." }, 400);
+    const rawWhatsapp = typeof body.whatsapp === "string" ? body.whatsapp.trim() : "";
+    const whatsapp = rawWhatsapp.replace(/\D/g, "");
+    if (!/^\d{8,15}$/.test(whatsapp)) {
+      return json({ error: "Masukkan nomor WhatsApp yang digunakan saat mendaftar." }, 400);
+    }
+
+    const now = Date.now();
+    const phoneHash = bytesToBase64Url(await hmacBytes(env.AUTH_SESSION_SECRET, `phone:${whatsapp}`));
+    const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+    const ipHash = bytesToBase64Url(await hmacBytes(env.AUTH_SESSION_SECRET, `ip:${clientIp}`));
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM whatsapp_login_requests WHERE created_at < ?").bind(now - 24 * 60 * 60 * 1000),
+      env.DB.prepare("DELETE FROM whatsapp_login_codes WHERE expires_at <= ? OR consumed_at IS NOT NULL").bind(now),
+    ]);
+
+    const [phoneRequests, ipRequests] = await Promise.all([
+      env.DB.prepare("SELECT COUNT(*) AS count FROM whatsapp_login_requests WHERE phone_hash = ? AND created_at >= ?")
+        .bind(phoneHash, now - WHATSAPP_LOGIN_RATE_WINDOW_MS).first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM whatsapp_login_requests WHERE ip_hash = ? AND created_at >= ?")
+        .bind(ipHash, now - WHATSAPP_LOGIN_RATE_WINDOW_MS).first(),
+    ]);
+    if (Number(phoneRequests?.count || 0) >= 3 || Number(ipRequests?.count || 0) >= 10) {
+      return json({ error: "Permintaan kode terlalu sering. Tunggu beberapa saat, lalu coba lagi." }, 429);
+    }
+    await env.DB.prepare(
+      "INSERT INTO whatsapp_login_requests (id, phone_hash, ip_hash, created_at) VALUES (?, ?, ?, ?)"
+    ).bind(crypto.randomUUID(), phoneHash, ipHash, now).run();
+
+    const user = await env.DB.prepare(`${USER_SELECT} WHERE users.whatsapp = ?`).bind(whatsapp).first();
+    if (!user || Number(user.is_active) !== 1) {
+      return json({ success: true, message: "Jika nomor terdaftar, kode masuk akan dikirim melalui WhatsApp." });
+    }
+
+    const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");
+    const challengeId = crypto.randomUUID();
+    const codeHash = await createWhatsAppLoginCodeHash(env.AUTH_SESSION_SECRET, challengeId, whatsapp, code);
+    const expiresAt = now + WHATSAPP_LOGIN_CODE_SECONDS * 1000;
+    await env.DB.prepare(`
+      INSERT INTO whatsapp_login_codes (whatsapp, challenge_id, user_id, code_hash, created_at, expires_at, attempts, consumed_at)
+      VALUES (?, ?, ?, ?, ?, ?, 0, NULL)
+      ON CONFLICT(whatsapp) DO UPDATE SET
+        challenge_id = excluded.challenge_id,
+        user_id = excluded.user_id,
+        code_hash = excluded.code_hash,
+        created_at = excluded.created_at,
+        expires_at = excluded.expires_at,
+        attempts = 0,
+        consumed_at = NULL
+    `).bind(whatsapp, challengeId, user.id, codeHash, now, expiresAt).run();
+
+    if (!await sendWhatsAppLoginCode(env, whatsapp, code)) {
+      await env.DB.prepare("UPDATE whatsapp_login_codes SET consumed_at = ? WHERE whatsapp = ? AND challenge_id = ?")
+        .bind(now, whatsapp, challengeId).run();
+      return json({ error: "Kode belum dapat dikirim. Coba lagi nanti atau masuk dengan kata sandi." }, 503);
+    }
+    return json({ success: true, message: "Jika nomor terdaftar, kode masuk akan dikirim melalui WhatsApp." });
+  }
+
+  if (pathname === "/api/auth/whatsapp-login/verify" && request.method === "POST") {
+    if (!sessionSecretConfigured(env)) return json({ error: AUTH_SETUP_MESSAGE }, 503);
+    const body = await parseJsonBody(request);
+    if (!body) return json({ error: "Nomor WhatsApp atau kode tidak valid." }, 400);
+    const rawWhatsapp = typeof body.whatsapp === "string" ? body.whatsapp.trim() : "";
+    const whatsapp = rawWhatsapp.replace(/\D/g, "");
+    const code = typeof body.code === "string" ? body.code.trim() : "";
+    if (!/^\d{8,15}$/.test(whatsapp) || !/^\d{6}$/.test(code)) {
+      return json({ error: "Masukkan nomor WhatsApp dan kode 6 angka yang benar." }, 400);
+    }
+
+    const now = Date.now();
+    const challenge = await env.DB.prepare(`
+      SELECT challenge_id, user_id, code_hash, expires_at, attempts
+      FROM whatsapp_login_codes
+      WHERE whatsapp = ? AND consumed_at IS NULL AND expires_at > ?
+    `).bind(whatsapp, now).first();
+    if (!challenge || Number(challenge.attempts) >= WHATSAPP_LOGIN_MAX_ATTEMPTS) {
+      return json({ error: "Kode tidak benar atau sudah kedaluwarsa. Minta kode baru." }, 401);
+    }
+
+    const key = await crypto.subtle.importKey(
+      "raw",
+      textEncoder.encode(env.AUTH_SESSION_SECRET),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      base64UrlToBytes(challenge.code_hash),
+      textEncoder.encode(`whatsapp-login:${challenge.challenge_id}:${whatsapp}:${code}`)
+    );
+    if (!valid) {
+      await env.DB.prepare(`
+        UPDATE whatsapp_login_codes
+        SET attempts = attempts + 1,
+          consumed_at = CASE WHEN attempts + 1 >= ? THEN ? ELSE consumed_at END
+        WHERE whatsapp = ? AND challenge_id = ? AND consumed_at IS NULL AND expires_at > ? AND attempts < ?
+      `).bind(WHATSAPP_LOGIN_MAX_ATTEMPTS, now, whatsapp, challenge.challenge_id, now, WHATSAPP_LOGIN_MAX_ATTEMPTS).run();
+      return json({ error: "Kode tidak benar atau sudah kedaluwarsa. Periksa kembali atau minta kode baru." }, 401);
+    }
+
+    const consumed = await env.DB.prepare(`
+      UPDATE whatsapp_login_codes SET consumed_at = ?
+      WHERE whatsapp = ? AND challenge_id = ? AND consumed_at IS NULL AND expires_at > ? AND attempts < ?
+    `).bind(now, whatsapp, challenge.challenge_id, now, WHATSAPP_LOGIN_MAX_ATTEMPTS).run();
+    if (!consumed.meta.changes) {
+      return json({ error: "Kode tidak benar atau sudah kedaluwarsa. Minta kode baru." }, 401);
+    }
+
+    const user = await getUserById(env, challenge.user_id);
+    if (!user || Number(user.is_active) !== 1) {
+      return json({ error: "Akun ini tidak aktif. Hubungi pengelola usaha." }, 403);
+    }
+    const token = await createSessionToken(env.AUTH_SESSION_SECRET, user.id, user.session_version);
+    return json({ success: true }, 200, cookieHeaders(request, token, AUTH_SESSION_SECONDS));
   }
 
   if (pathname === "/api/auth/signup" && request.method === "POST") {
@@ -292,9 +493,9 @@ async function authApi(request, env, pathname) {
       || !username || username.length > 128
       || !/^[+()\d\s.-]+$/.test(rawWhatsapp)
       || !/^[\d]{8,15}$/.test(whatsapp)
-      || password.length < 12 || password.length > 256
+      || password.length < 4 || password.length > 12
     ) {
-      return json({ error: "Periksa kembali nama usaha, nama pengguna, WhatsApp, dan password (12–256 karakter)." }, 400);
+      return json({ error: "Periksa kembali nama usaha, nama pengguna, WhatsApp, dan kata sandi (4–12 karakter)." }, 400);
     }
 
     // Pemeriksaan awal memberi pesan ramah; indeks unik database tetap menjadi penjaga terakhir.
@@ -343,18 +544,36 @@ async function authApi(request, env, pathname) {
     const username = typeof body.username === "string" ? body.username.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
     if (username.length > 128 || password.length > 256 || !username || !password) {
-      return json({ error: "Nama pengguna atau password salah." }, 401);
+      return json({ error: "Nama pengguna/usaha atau kata sandi salah." }, 401);
     }
 
-    const lookup = username.replace(/\D/g, "");
-    const user = await env.DB.prepare(
-      `${USER_SELECT} WHERE username = ? COLLATE NOCASE OR (whatsapp <> '' AND whatsapp = ?)`
-    ).bind(username, lookup).first();
+    let user = await env.DB.prepare(
+      `${USER_SELECT} WHERE users.username = ? COLLATE NOCASE`
+    ).bind(username).first();
+    if (!user) {
+      const businessMatches = await env.DB.prepare(`
+        SELECT COUNT(*) AS count
+        FROM users
+        JOIN businesses ON businesses.id = users.business_id
+        WHERE businesses.name = ? COLLATE NOCASE
+      `).bind(username).first();
+      if (Number(businessMatches?.count || 0) > 1) {
+        await derivePasswordHash(password, new Uint8Array(16), PASSWORD_HASH_ITERATIONS);
+        return json({
+          error: "Nama usaha atau kata sandi salah. Jika nama usaha digunakan usaha lain, masuklah dengan nama pengguna.",
+        }, 401);
+      }
+      if (Number(businessMatches?.count || 0) === 1) {
+        user = await env.DB.prepare(
+          `${USER_SELECT} WHERE businesses.name = ? COLLATE NOCASE`
+        ).bind(username).first();
+      }
+    }
     const passwordMatches = user
       ? await verifyPassword(password, user)
       : await derivePasswordHash(password, new Uint8Array(16), PASSWORD_HASH_ITERATIONS);
     if (!user || Number(user.is_active) !== 1 || !passwordMatches) {
-      return json({ error: "Nama pengguna atau password salah." }, 401);
+      return json({ error: "Nama pengguna/usaha atau kata sandi salah." }, 401);
     }
 
     const encryptedPassword = await encryptPassword(password, env.AUTH_SESSION_SECRET);
@@ -431,8 +650,8 @@ async function authApi(request, env, pathname) {
     if (hasBusinessName && (!businessName || businessName.length > 120)) {
       return json({ error: "Nama toko wajib diisi dan maksimal 120 karakter." }, 400);
     }
-    if (newPassword && (newPassword.length < 12 || newPassword.length > 256)) {
-      return json({ error: "Password baru harus berisi 12 sampai 256 karakter." }, 400);
+    if (newPassword && (newPassword.length < 4 || newPassword.length > 12)) {
+      return json({ error: "Kata sandi baru harus berisi 4 sampai 12 karakter." }, 400);
     }
     if (newPassword && !currentPassword) {
       return json({ error: "Password saat ini wajib diisi untuk mengganti password." }, 400);
@@ -749,7 +968,7 @@ async function adminDataApi(request, env) {
         time: row.waktu,
         total: Number(row.total),
         paymentMethod: row.payment_method || "tunai",
-        paymentLabel: row.payment_label || (row.payment_method === "qris" ? "QRIS" : "Tunai"),
+        paymentLabel: row.payment_label || (row.payment_method === "qris" ? "QR" : "Tunai"),
         itemCount: Number(row.item_count) || 0,
       })),
       total: Number(count?.total) || 0,
@@ -786,7 +1005,7 @@ async function adminDataApi(request, env) {
       kembalian: Number(transaction.kembalian),
       member: Boolean(transaction.member),
       paymentMethod: transaction.payment_method || "tunai",
-      paymentLabel: transaction.payment_label || (transaction.payment_method === "qris" ? "QRIS" : "Tunai"),
+      paymentLabel: transaction.payment_label || (transaction.payment_method === "qris" ? "QR" : "Tunai"),
       items: (items.results || []).map((item) => ({
         code: item.code,
         name: item.name,
@@ -866,7 +1085,7 @@ async function adminDataApi(request, env) {
     const body = await parseJsonBody(request);
     const businessId = typeof body?.businessId === "string" ? body.businessId : "";
     if (!/^[\w-]{1,128}$/.test(businessId) || typeof body?.qrisEnabled !== "boolean") {
-      return json({ error: "Pengaturan QRIS tidak valid." }, 400);
+      return json({ error: "Pengaturan QR tidak valid." }, 400);
     }
     const business = await env.DB.prepare(
       "SELECT id FROM businesses WHERE id = ?"
@@ -1069,10 +1288,10 @@ async function paymentSettingsApi(request, env, businessId) {
       || typeof enabled !== "boolean"
       || !validQrisCropSelection(cropSelection)
     ) {
-      return json({ error: "Nama, gambar, atau status QRIS tidak valid." }, 400);
+      return json({ error: "Nama, gambar, atau status QR tidak valid." }, 400);
     }
     if (!image || !validQrisImage(image) || !sourceImage || !validQrisImage(sourceImage)) {
-      return json({ error: "Gambar QRIS tidak valid atau terlalu besar." }, 400);
+      return json({ error: "Gambar QR tidak valid atau terlalu besar." }, 400);
     }
     const [count, duplicate] = await Promise.all([
       env.DB.prepare(
@@ -1085,7 +1304,7 @@ async function paymentSettingsApi(request, env, businessId) {
     if (Number(count?.total) >= MAX_QRIS_COUNT_PER_BUSINESS) {
       return json({
         code: "QR_LIMIT_REACHED",
-        error: `Usaha ini sudah menyimpan ${MAX_QRIS_COUNT_PER_BUSINESS} QRIS. Hapus salah satu untuk menambahkan QR baru.`,
+        error: `Usaha ini sudah menyimpan ${MAX_QRIS_COUNT_PER_BUSINESS} QR. Hapus salah satu untuk menambahkan QR baru.`,
       }, 409);
     }
     if (duplicate) {
@@ -1118,7 +1337,7 @@ async function paymentSettingsApi(request, env, businessId) {
       || !sourceImage
       || !validQrisCropSelection(cropSelection)
     ) {
-      return json({ error: "Nama, gambar, atau QRIS yang dipilih tidak valid." }, 400);
+      return json({ error: "Nama, gambar, atau QR yang dipilih tidak valid." }, 400);
     }
     const [existing, duplicate] = await Promise.all([
       env.DB.prepare(
@@ -1128,8 +1347,8 @@ async function paymentSettingsApi(request, env, businessId) {
         "SELECT id FROM business_payment_qrs WHERE business_id = ? AND name = ? COLLATE NOCASE AND id <> ?"
       ).bind(businessId, name, id).first(),
     ]);
-    if (!existing) return json({ error: "QRIS tidak ditemukan pada usaha ini." }, 404);
-    if (duplicate) return json({ error: "Nama QRIS sudah digunakan. Pilih nama lain." }, 409);
+    if (!existing) return json({ error: "QR tidak ditemukan pada usaha ini." }, 404);
+    if (duplicate) return json({ error: "Nama QR sudah digunakan. Pilih nama lain." }, 409);
     await env.DB.prepare(
       `UPDATE business_payment_qrs
        SET name = ?, image = ?, source_image = ?, crop_selection = ?, updated_at = CURRENT_TIMESTAMP
@@ -1141,23 +1360,23 @@ async function paymentSettingsApi(request, env, businessId) {
   if (request.method === "PATCH") {
     const id = typeof body?.id === "string" ? body.id.trim() : "";
     if (!id || id.length > 128 || typeof body?.enabled !== "boolean") {
-      return json({ error: "QRIS atau status yang dipilih tidak valid." }, 400);
+      return json({ error: "QR atau status yang dipilih tidak valid." }, 400);
     }
     const result = await env.DB.prepare(
       `UPDATE business_payment_qrs SET is_enabled = ?, updated_at = CURRENT_TIMESTAMP
        WHERE business_id = ? AND id = ?`
     ).bind(body.enabled ? 1 : 0, businessId, id).run();
-    if (!result.meta.changes) return json({ error: "QRIS tidak ditemukan pada usaha ini." }, 404);
+    if (!result.meta.changes) return json({ error: "QR tidak ditemukan pada usaha ini." }, 404);
     return json({ success: true });
   }
 
   if (request.method === "DELETE") {
     const id = new URL(request.url).searchParams.get("id") || "";
-    if (!id || id.length > 128) return json({ error: "QRIS yang dipilih tidak valid." }, 400);
+    if (!id || id.length > 128) return json({ error: "QR yang dipilih tidak valid." }, 400);
     const result = await env.DB.prepare(
       "DELETE FROM business_payment_qrs WHERE business_id = ? AND id = ?"
     ).bind(businessId, id).run();
-    if (!result.meta.changes) return json({ error: "QRIS tidak ditemukan pada usaha ini." }, 404);
+    if (!result.meta.changes) return json({ error: "QR tidak ditemukan pada usaha ini." }, 404);
     return json({ success: true });
   }
 
@@ -1199,7 +1418,7 @@ async function getTransactions(env, businessId) {
       dibayar: row.dibayar,
       kembalian: row.kembalian,
       metodePembayaran: row.payment_method || "tunai",
-      labelPembayaran: row.payment_label || (row.payment_method === "qris" ? "QRIS" : "Tunai"),
+      labelPembayaran: row.payment_label || (row.payment_method === "qris" ? "QR" : "Tunai"),
       member: Boolean(row.member),
       items: (items.results || []).map((item) => ({
         kode: item.kode,
@@ -1304,13 +1523,13 @@ async function transactionsApi(request, env, businessId) {
   let paymentLabel = "Tunai";
   if (paymentMethod === "qris") {
     if (!paymentQrId || paymentQrId.length > 128) {
-      return json({ error: "Pilih QRIS yang akan digunakan." }, 400);
+      return json({ error: "Pilih QR yang akan digunakan." }, 400);
     }
     const qr = await env.DB.prepare(
       "SELECT name, image FROM business_payment_qrs WHERE business_id = ? AND id = ? AND is_enabled = 1"
     ).bind(businessId, paymentQrId).first();
     if (!qr?.image || body.qrisConfirmed !== true) {
-      return json({ error: "QRIS belum siap atau pembayaran belum dikonfirmasi." }, 400);
+      return json({ error: "QR belum siap atau pembayaran belum dikonfirmasi." }, 400);
     }
     paymentLabel = qr.name;
   }
@@ -1687,7 +1906,7 @@ async function refreshStoreAlerts(env, businessId) {
       title: "Penjualan menurun dibanding pekan sebelumnya",
       message: `Penjualan 7 hari terakhir turun ${Math.round(Math.abs(change))}% dibanding 7 hari sebelumnya.`,
       evidence: { current_7_days: Number(cur.total), previous_7_days: Number(prev.total), change_percent: Math.round(change) },
-      action_label: "Tanya Smart Insight", action_type: "chat", action_payload: { prompt: "Bantu analisis penurunan penjualan toko saya." } });
+      action_label: "Lihat Analisis", action_type: "insight", action_payload: {} });
     else if (change >= 20) detected.push({ key: "sales-rise-7d", category: "penjualan", priority: "info",
       title: "Penjualan meningkat",
       message: `Penjualan 7 hari terakhir naik ${Math.round(change)}% dibanding 7 hari sebelumnya.`,
@@ -1744,144 +1963,6 @@ async function storeAlertsApi(request, env, businessId, pathname) {
   return json({ success: true });
 }
 
-async function getAssistantContext(env, businessId) {
-  const [sales, products, recent] = await Promise.all([
-    env.DB.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(total),0) AS total FROM transactions WHERE business_id=? AND waktu>=?")
-      .bind(businessId, new Date(Date.now()-30*86400000).toISOString()).first(),
-    env.DB.prepare("SELECT code,name,category,price,stock FROM products WHERE business_id=? ORDER BY name").bind(businessId).all(),
-    env.DB.prepare("SELECT t.waktu,t.total,ti.name,ti.qty FROM transactions t JOIN transaction_items ti ON ti.transaction_id=t.id WHERE t.business_id=? ORDER BY t.waktu DESC LIMIT 100")
-      .bind(businessId).all(),
-  ]);
-  return { ringkasan_30_hari: { jumlah_transaksi: Number(sales?.n||0), total_penjualan: Number(sales?.total||0) },
-    produk: products.results || [], item_transaksi_terbaru: recent.results || [] };
-}
-
-async function callGemini(env, prompt, maxTokens=1200) {
-  if (!env.GEMINI_API_KEY) return { error: "AI belum diaktifkan. Pengelola perlu mengatur GEMINI_API_KEY pada backend." };
-  const model = getGeminiModel(env);
-  try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: String(prompt || "") }] }], generationConfig: { temperature: 0.3, maxOutputTokens: maxTokens } })
-    });
-    const rawResponse = await response.text();
-    let data = {};
-    try { data = rawResponse ? JSON.parse(rawResponse) : {}; } catch { data = {}; }
-    if (!response.ok) {
-      const providerMessage = extractGeminiError(data, rawResponse, response.status);
-      console.error("[GEMINI API ERROR]", { status: response.status, model, message: providerMessage });
-      return { error: `${geminiErrorMessage(response.status)} Detail: ${providerMessage}` };
-    }
-    const text = data.candidates?.[0]?.content?.parts?.map(part => part.text || "").join("").trim() || "";
-    if (!text) {
-      const reason = data.candidates?.[0]?.finishReason || data.promptFeedback?.blockReason || "Respons AI kosong.";
-      console.error("[GEMINI EMPTY RESPONSE]", { model, reason });
-      return { error: `Gemini tidak memberikan jawaban teks (${reason}). Coba ubah pertanyaan.` };
-    }
-    return { text };
-  } catch (error) {
-    console.error("[GEMINI NETWORK ERROR]", { model, message: error?.message || String(error) });
-    return { error: "Tidak dapat terhubung ke Gemini. Periksa koneksi server dan coba lagi." };
-  }
-}
-
-async function signActionToken(env, payload) {
-  const key = await crypto.subtle.importKey("raw", textEncoder.encode(env.AUTH_SESSION_SECRET), {name:"HMAC",hash:"SHA-256"}, false, ["sign"]);
-  const encoded = bytesToBase64Url(textEncoder.encode(JSON.stringify(payload)));
-  const sig = await crypto.subtle.sign("HMAC", key, textEncoder.encode(encoded));
-  return `${encoded}.${bytesToBase64Url(new Uint8Array(sig))}`;
-}
-async function verifyActionToken(env, token) {
-  try {
-    const [encoded, signature, ...extra] = String(token||"").split(".");
-    if (!encoded || !signature || extra.length) return null;
-    const key = await crypto.subtle.importKey("raw", textEncoder.encode(env.AUTH_SESSION_SECRET), {name:"HMAC",hash:"SHA-256"}, false, ["verify"]);
-    if (!await crypto.subtle.verify("HMAC", key, base64UrlToBytes(signature), textEncoder.encode(encoded))) return null;
-    const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded)));
-    return payload.exp > Date.now() ? payload : null;
-  } catch { return null; }
-}
-
-async function assistantApi(request, env, businessId, pathname) {
-  const body = await parseJsonBody(request);
-  if (!body) return json({ error:"Format pesan tidak valid." },400);
-  const context = await getAssistantContext(env,businessId);
-  if (pathname === "/api/smart-insight/chat" && request.method === "POST") {
-    const message = typeof body.message === "string" ? body.message.trim().slice(0,2000) : "";
-    const mode = body.mode === "creation" ? "creation" : "chat";
-    if (!message) return json({error:"Tuliskan pertanyaan terlebih dahulu."},400);
-    const prompt = `Anda adalah Tanya Smart Insight, pendamping pemilik UMKM. Jawab bahasa Indonesia yang ramah, ringkas, praktis. Data berikut hanya milik toko yang sedang login. Gunakan hanya fakta ini; bila data tidak cukup katakan apa adanya. Tidak tersedia harga modal/laba/kedaluwarsa. Jangan mengeksekusi atau mengklaim perubahan data.
-Mode: ${mode === "creation" ? "AI Creation: hasilkan konten yang diminta, siap disalin. Gunakan detail produk hanya jika cocok dengan data." : "Konsultasi kondisi usaha berbasis data."}
-DATA TOKO: ${JSON.stringify(context)}
-RIWAYAT SINGKAT: ${JSON.stringify(Array.isArray(body.history)?body.history.slice(-8):[])}
-PERTANYAAN: ${message}`;
-    const answer = await callGemini(env,prompt,1600);
-    if (answer.error) return json({error:answer.error},503);
-    return json({success:true,answer:answer.text,mode});
-  }
-  if (pathname === "/api/smart-insight/action/prepare" && request.method === "POST") {
-    const instruction = typeof body.instruction === "string" ? body.instruction.trim().slice(0,1000) : "";
-    if (!instruction) return json({error:"Jelaskan perubahan yang diinginkan."},400);
-    const prompt = `Ekstrak permintaan tindakan dari pemilik toko. Balas JSON saja dengan skema {"action":"create_product|update_product|add_stock|none","product_name":"","new_name":"","price":0,"stock":0,"category":"","reason":""}. Jangan menebak data yang tidak disebutkan. Untuk update harga isi price; untuk tambah stok isi stock. Produk yang dirujuk harus cocok dengan daftar produk.
-Produk: ${JSON.stringify(context.produk)}
-Permintaan: ${instruction}`;
-    const result = await callGemini(env,prompt,500);
-    if (result.error) return json({error:result.error},503);
-    const parsed = parseGeminiJson(result.text);
-    if (!parsed || !["create_product","update_product","add_stock","none"].includes(parsed.action)) return json({error:"AI belum dapat memahami tindakan tersebut. Coba jelaskan lebih spesifik."},422);
-    let action = {type:parsed.action};
-    let summary = "";
-    if (parsed.action === "create_product") {
-      const name=String(parsed.product_name||"").trim(), price=Number(parsed.price), stock=Number(parsed.stock||0), category=String(parsed.category||"Umum").trim();
-      if (!name || !Number.isSafeInteger(price)||price<=0||!Number.isSafeInteger(stock)||stock<0) return json({error:"Untuk membuat produk baru, nama, harga, dan stok harus jelas."},422);
-      action={type:"create_product",name,price,stock,category,barcode:`AI-${crypto.randomUUID()}`}; summary=`Tambahkan produk ${name}, harga ${rupiah(price)}, stok ${stock} unit, kategori ${category}. Barcode internal akan dibuat otomatis.`;
-    } else if (parsed.action === "update_product" || parsed.action === "add_stock") {
-      const name=String(parsed.product_name||"").trim();
-      const product=context.produk.find(p=>p.name.toLowerCase()===name.toLowerCase());
-      if (!product) return json({error:`Produk “${name||"yang dimaksud"}” tidak ditemukan dengan nama yang sama. Periksa nama produk di daftar produk.`},404);
-      if (parsed.action==="update_product") {
-        const price=Number(parsed.price);
-        if(!Number.isSafeInteger(price)||price<=0) return json({error:"Harga baru belum valid."},422);
-        action={type:"update_product",code:product.code,price}; summary=`Ubah harga ${product.name} dari ${rupiah(product.price)} menjadi ${rupiah(price)}.`;
-      } else {
-        const qty=Number(parsed.stock);
-        if(!Number.isSafeInteger(qty)||qty<=0||qty>100000) return json({error:"Jumlah stok tambahan belum valid."},422);
-        action={type:"add_stock",code:product.code,stock_before:Number(product.stock),quantity:qty}; summary=`Tambahkan ${qty} unit stok ${product.name}. Stok saat ini ${product.stock}, setelah perubahan menjadi ${Number(product.stock)+qty} unit.`;
-      }
-    } else return json({error:"Permintaan ini belum dapat diterjemahkan menjadi tindakan produk yang aman. Silakan gunakan Tanya Smart Insight."},422);
-    const token=await signActionToken(env,{businessId,action,exp:Date.now()+5*60*1000,nonce:crypto.randomUUID()});
-    return json({success:true,preview:{summary,expires_in_seconds:300},confirmation_token:token});
-  }
-  if (pathname === "/api/smart-insight/action/confirm" && request.method === "POST") {
-    const payload=await verifyActionToken(env,body.confirmation_token);
-    if(!payload||payload.businessId!==businessId) return json({error:"Persetujuan sudah kedaluwarsa atau tidak valid. Siapkan tindakan kembali."},400);
-    const a=payload.action;
-    if(a.type==="create_product") {
-      const duplicate=await env.DB.prepare("SELECT code FROM products WHERE business_id=? AND barcode=?").bind(businessId,a.barcode).first();
-      if(duplicate) return json({error:"Barcode tersebut sudah digunakan produk lain."},409);
-      const next=await env.DB.prepare("SELECT COALESCE(MAX(CAST(id AS INTEGER)),0)+1 AS nomor FROM products WHERE business_id=?").bind(businessId).first();
-      const code=`K${String(next.nomor).padStart(2,"0")}`;
-      await env.DB.prepare("INSERT INTO products (id,business_id,code,barcode,name,category,price,stock,image) VALUES (?,?,?,?,?,?,?,?,?)")
-        .bind(String(next.nomor),businessId,code,a.barcode,a.name,a.category,a.price,a.stock,"").run();
-      return json({success:true,message:`Produk ${a.name} berhasil ditambahkan.`,code});
-    }
-    if(a.type==="update_product") {
-      const r=await env.DB.prepare("UPDATE products SET price=? WHERE business_id=? AND code=?").bind(a.price,businessId,a.code).run();
-      if(!r.meta.changes)return json({error:"Produk tidak ditemukan atau sudah berubah."},409);
-      return json({success:true,message:"Harga produk berhasil diperbarui."});
-    }
-    if(a.type==="add_stock") {
-      const r=await env.DB.prepare("UPDATE products SET stock=stock+? WHERE business_id=? AND code=? AND stock=?")
-        .bind(a.quantity,businessId,a.code,a.stock_before).run();
-      if(!r.meta.changes)return json({error:"Stok produk sudah berubah. Muat ulang data sebelum mencoba lagi."},409);
-      return json({success:true,message:"Stok produk berhasil ditambahkan."});
-    }
-    return json({error:"Jenis tindakan tidak dikenal."},400);
-  }
-  return json({error:"Endpoint Tanya Smart Insight tidak ditemukan."},404);
-}
-
 export default {
   async fetch(request, env, context) {
     const url = new URL(request.url);
@@ -1922,9 +2003,6 @@ export default {
         }
         if (url.pathname === "/api/store-alerts" || url.pathname.startsWith("/api/store-alerts/")) {
           return await storeAlertsApi(request, env, user.business_id, url.pathname);
-        }
-        if (url.pathname.startsWith("/api/smart-insight/chat") || url.pathname.startsWith("/api/smart-insight/action/")) {
-          return await assistantApi(request, env, user.business_id, url.pathname);
         }
         if (url.pathname === "/api/smart-insight" && request.method === "POST") {
           return await smartInsightApi(request, env, user.business_id);

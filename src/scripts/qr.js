@@ -4,6 +4,7 @@ const qrEditor = $("qr-editor");
 const qrForm = $("qr-form");
 const cropCanvas = $("qr-crop-canvas");
 const cropContext = cropCanvas.getContext("2d");
+const namaQrTampilan = (nama) => nama === "QRIS" ? "QR" : nama;
 let qrs = [];
 let editingQr = null;
 let pendingImage = null;
@@ -33,7 +34,7 @@ async function requestApi(url, options = {}) {
     window.location.replace("/login.html");
     throw new Error("Sesi berakhir. Silakan masuk kembali.");
   }
-  if (!response.ok) throw new Error(data.error || "Permintaan QRIS gagal.");
+  if (!response.ok) throw new Error(data.error || "Permintaan QR gagal.");
   return data;
 }
 
@@ -111,7 +112,7 @@ async function setCropSource(imageSource, initialSelection = null) {
   }
   if (bitmap.width < 40 || bitmap.height < 40) {
     bitmap.close();
-    throw new Error("Resolusi gambar terlalu kecil untuk memilih area QRIS.");
+    throw new Error("Resolusi gambar terlalu kecil untuk memilih area QR.");
   }
   const scale = Math.min(1, 1000 / Math.max(bitmap.width, bitmap.height));
   sourceCanvas = document.createElement("canvas");
@@ -258,7 +259,7 @@ function canvasToBlob(canvas, quality) {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (blob) resolve(blob);
-      else reject(new Error("Potongan QRIS tidak dapat dibuat."));
+      else reject(new Error("Potongan QR tidak dapat dibuat."));
     }, "image/webp", quality);
   });
 }
@@ -266,8 +267,8 @@ function canvasToBlob(canvas, quality) {
 function blobToDataUrl(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.addEventListener("load", () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Gambar QRIS tidak dapat dibaca.")), { once: true });
-    reader.addEventListener("error", () => reject(new Error("Gambar QRIS tidak dapat dibaca.")), { once: true });
+    reader.addEventListener("load", () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Gambar QR tidak dapat dibaca.")), { once: true });
+    reader.addEventListener("error", () => reject(new Error("Gambar QR tidak dapat dibaca.")), { once: true });
     reader.readAsDataURL(blob);
   });
 }
@@ -279,7 +280,7 @@ async function encodeCanvas(canvas) {
     output.width = Math.max(1, Math.round(canvas.width * scale));
     output.height = Math.max(1, Math.round(canvas.height * scale));
     const context = output.getContext("2d");
-    if (!context) throw new Error("Gambar QRIS tidak dapat diproses.");
+    if (!context) throw new Error("Gambar QR tidak dapat diproses.");
     context.fillStyle = "#fff";
     context.fillRect(0, 0, output.width, output.height);
     context.drawImage(canvas, 0, 0, output.width, output.height);
@@ -289,7 +290,7 @@ async function encodeCanvas(canvas) {
     }
     scale *= 0.8;
   }
-  throw new Error("Gambar QRIS terlalu besar untuk disimpan. Pilih gambar yang lebih sederhana.");
+  throw new Error("Gambar QR terlalu besar untuk disimpan. Pilih gambar yang lebih sederhana.");
 }
 
 async function encodeSelection() {
@@ -297,7 +298,7 @@ async function encodeSelection() {
   output.width = Math.max(1, Math.round(selection.w));
   output.height = Math.max(1, Math.round(selection.h));
   const context = output.getContext("2d");
-  if (!context) throw new Error("Area QRIS tidak dapat diproses.");
+  if (!context) throw new Error("Area QR tidak dapat diproses.");
   context.fillStyle = "#fff";
   context.fillRect(0, 0, output.width, output.height);
   context.drawImage(
@@ -322,8 +323,8 @@ function getNormalizedSelection() {
 function showPreview(image) {
   $("qr-image-preview-wrap").hidden = !image;
   $("qr-image-preview-caption").textContent = pendingImage
-    ? "Area gambar yang akan ditampilkan sebagai QRIS"
-    : "Gambar QRIS saat ini";
+    ? "Area gambar yang akan ditampilkan sebagai QR"
+    : "Gambar QR saat ini";
   $("qr-image-preview").src = image || "";
 }
 
@@ -348,9 +349,9 @@ function openEditor(qr = null) {
   pendingImage = null;
   pendingSourceImage = null;
   pendingCropSelection = null;
-  $("qr-editor-title").textContent = qr ? "Ubah QRIS" : "Tambah QRIS";
-  $("qr-save").textContent = qr ? "Simpan perubahan" : "Simpan QRIS";
-  $("qr-name").value = qr?.name || "";
+  $("qr-editor-title").textContent = qr ? "Ubah QR" : "Tambah QR";
+  $("qr-save").textContent = qr ? "Simpan perubahan" : "Simpan QR";
+  $("qr-name").value = qr ? namaQrTampilan(qr.name) : "";
   $("qr-image-file").value = "";
   $("qr-image-status").textContent = "";
   $("qr-crop-stage").hidden = true;
@@ -365,12 +366,12 @@ function renderList() {
   qrList.replaceChildren();
   const count = document.createElement("p");
   count.className = "qr-manager-count";
-  count.textContent = `${qrs.length} dari 10 QRIS tersimpan`;
+  count.textContent = `${qrs.length} dari 10 QR tersimpan`;
   qrList.appendChild(count);
   if (!qrs.length) {
     const empty = document.createElement("p");
     empty.className = "empty-state";
-    empty.textContent = "Belum ada QRIS. Tambahkan QRIS agar bisa dipilih saat transaksi.";
+    empty.textContent = "Belum ada QR. Tambahkan QR agar bisa dipilih saat transaksi.";
     qrList.appendChild(empty);
     return;
   }
@@ -379,12 +380,12 @@ function renderList() {
     card.className = "qr-manager-card";
     const image = document.createElement("img");
     image.src = qr.image;
-    image.alt = `QRIS ${qr.name}`;
+    image.alt = `QR ${namaQrTampilan(qr.name)}`;
     image.loading = "lazy";
     const details = document.createElement("div");
     details.className = "qr-manager-details";
     const title = document.createElement("h3");
-    title.textContent = qr.name;
+    title.textContent = namaQrTampilan(qr.name);
     const status = document.createElement("span");
     status.className = `admin-status-badge ${qr.enabled ? "active" : "inactive"}`;
     status.textContent = qr.enabled ? "Aktif di kasir" : "Nonaktif";
@@ -432,7 +433,7 @@ async function updateEnabled(qr) {
       body: JSON.stringify({ id: qr.id, enabled: !qr.enabled }),
     });
     if (await loadQrs()) {
-      showNotice(`${qr.name} berhasil ${qr.enabled ? "dinonaktifkan" : "diaktifkan"}.`, "success");
+      showNotice(`${namaQrTampilan(qr.name)} berhasil ${qr.enabled ? "dinonaktifkan" : "diaktifkan"}.`, "success");
     }
   } catch (error) {
     showNotice(error.message, "error");
@@ -440,10 +441,10 @@ async function updateEnabled(qr) {
 }
 
 async function removeQr(qr) {
-  if (!window.confirm(`Hapus QRIS "${qr.name}"?`)) return;
+  if (!window.confirm(`Hapus QR "${namaQrTampilan(qr.name)}"?`)) return;
   try {
     await requestApi(`/api/payment-settings?id=${encodeURIComponent(qr.id)}`, { method: "DELETE" });
-    if (await loadQrs()) showNotice(`${qr.name} berhasil dihapus.`, "success");
+    if (await loadQrs()) showNotice(`${namaQrTampilan(qr.name)} berhasil dihapus.`, "success");
   } catch (error) {
     showNotice(error.message, "error");
   }
@@ -451,7 +452,7 @@ async function removeQr(qr) {
 
 $("qr-add").addEventListener("click", () => {
   if (qrs.length >= 10) {
-    showNotice("Maksimal 10 QRIS per usaha. Hapus QRIS lain sebelum menambahkan yang baru.", "error");
+    showNotice("Maksimal 10 QR per usaha. Hapus QR lain sebelum menambahkan yang baru.", "error");
     return;
   }
   openEditor();
@@ -471,7 +472,7 @@ $("qr-image-file").addEventListener("change", async (event) => {
     }
     if (file.size > 12 * 1024 * 1024) throw new Error("Ukuran gambar asli maksimal 12 MB.");
     await setCropSource(file);
-    $("qr-image-status").textContent = "Atur area yang akan ditampilkan sebagai QRIS. Gambar di luar area tetap tersimpan.";
+    $("qr-image-status").textContent = "Atur area yang akan ditampilkan sebagai QR. Gambar di luar area tetap tersimpan.";
   } catch (error) {
     event.currentTarget.value = "";
     $("qr-image-status").textContent = error.message;
@@ -481,7 +482,7 @@ $("qr-image-file").addEventListener("change", async (event) => {
 $("qr-crop-reset").addEventListener("click", resetCrop);
 $("qr-crop-apply").addEventListener("click", async () => {
   $("qr-crop-apply").disabled = true;
-  $("qr-image-status").textContent = "Menyimpan pilihan area QRIS...";
+  $("qr-image-status").textContent = "Menyimpan pilihan area QR...";
   try {
     const [image, sourceImage] = await Promise.all([
       encodeSelection(),
@@ -508,7 +509,7 @@ $("qr-image-recrop").addEventListener("click", async () => {
   $("qr-image-status").textContent = "Membuka gambar utuh...";
   try {
     const response = await fetch(image);
-    if (!response.ok) throw new Error("Gambar QRIS tidak dapat dibuka.");
+    if (!response.ok) throw new Error("Gambar QR tidak dapat dibuka.");
     await setCropSource(await response.blob(), cropSelection);
     $("qr-image-status").textContent = "Atur ulang area yang digunakan. Gambar di luar area tetap tersimpan.";
   } catch (error) {
@@ -520,7 +521,7 @@ $("qr-cancel").addEventListener("click", hideEditor);
 qrForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!$("qr-crop-stage").hidden) {
-    $("qr-image-status").textContent = "Simpan pilihan area terlebih dahulu agar tampilan QRIS diperbarui.";
+    $("qr-image-status").textContent = "Simpan pilihan area terlebih dahulu agar tampilan QR diperbarui.";
     return;
   }
   const name = $("qr-name").value.trim();
@@ -528,11 +529,11 @@ qrForm.addEventListener("submit", async (event) => {
   const sourceImage = pendingSourceImage || editingQr?.sourceImage || image;
   const cropSelection = pendingCropSelection || editingQr?.cropSelection || { x: 0, y: 0, w: 1, h: 1 };
   if (!name || name.length > 40) {
-    $("qr-image-status").textContent = "Nama QRIS wajib diisi dan maksimal 40 karakter.";
+    $("qr-image-status").textContent = "Nama QR wajib diisi dan maksimal 40 karakter.";
     return;
   }
   if (!image) {
-    $("qr-image-status").textContent = "Pilih gambar dan tentukan area QRIS terlebih dahulu.";
+    $("qr-image-status").textContent = "Pilih gambar dan tentukan area QR terlebih dahulu.";
     return;
   }
   $("qr-save").disabled = true;
@@ -563,7 +564,7 @@ qrForm.addEventListener("submit", async (event) => {
 loadQrs().then((loaded) => {
   if (!loaded) return;
   if (new URLSearchParams(location.search).get("add") === "1") {
-    if (qrs.length >= 10) showNotice("Maksimal 10 QRIS per usaha sudah tersimpan.", "error");
+    if (qrs.length >= 10) showNotice("Maksimal 10 QR per usaha sudah tersimpan.", "error");
     else openEditor();
   }
 });

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1565c0">
-  <title>Kelola QRIS - Kasir Bisa</title>
+  <title>Kelola QR - Kasir Bisa</title>
   <script src="scripts/auth-guard.js"></script>
   <link rel="stylesheet" href="assets/css/style.css">
   <link rel="icon" type="image/png" href="icon/Favicon.png">
@@ -15,8 +15,8 @@
       <a class="secondary-button" href="index.html">← Kembali ke Kasir</a>
       <div>
         <p class="eyebrow">METODE PEMBAYARAN</p>
-        <h1>Kelola QRIS</h1>
-        <p>Tambah, ubah nama atau gambar, dan pilih QRIS yang tersedia di Kasir.</p>
+        <h1>Kelola QR</h1>
+        <p>Tambah, ubah nama atau gambar, dan pilih QR yang tersedia di Kasir.</p>
       </div>
     </header>
 
@@ -25,36 +25,36 @@
     <section class="qr-manager-panel" aria-labelledby="qr-list-title">
       <div class="qr-manager-section-heading">
         <div>
-          <h2 id="qr-list-title">Daftar QRIS</h2>
-          <p>Anda dapat menyimpan hingga 10 QRIS untuk usaha ini.</p>
+          <h2 id="qr-list-title">Daftar QR</h2>
+          <p>Anda dapat menyimpan hingga 10 QR untuk usaha ini.</p>
         </div>
-        <button id="qr-add" class="primary-button" type="button">＋ Tambah QRIS</button>
+        <button id="qr-add" class="primary-button" type="button">＋ Tambah QR</button>
       </div>
       <div id="qr-list" class="qr-manager-list" aria-live="polite">
-        <p class="empty-state">Memuat daftar QRIS...</p>
+        <p class="empty-state">Memuat daftar QR...</p>
       </div>
     </section>
 
     <section id="qr-editor" class="qr-manager-panel qr-editor-panel" aria-labelledby="qr-editor-title" hidden>
       <div class="qr-manager-section-heading">
         <div>
-          <p class="eyebrow">PENGATURAN QRIS</p>
-          <h2 id="qr-editor-title">Tambah QRIS</h2>
+          <p class="eyebrow">PENGATURAN QR</p>
+          <h2 id="qr-editor-title">Tambah QR</h2>
         </div>
       </div>
       <form id="qr-form">
-        <label for="qr-name">Nama QRIS
-          <input id="qr-name" type="text" maxlength="40" autocomplete="off" placeholder="Contoh: QRIS Toko" required>
+        <label for="qr-name">Nama QR
+          <input id="qr-name" type="text" maxlength="40" autocomplete="off" placeholder="Contoh: QR Toko" required>
         </label>
-        <label for="qr-image-file">Gambar QRIS
+        <label for="qr-image-file">Gambar QR
           <input id="qr-image-file" type="file" accept="image/jpeg,image/png,image/webp">
           <small>Pilih JPG, PNG, atau WebP. Ukuran file asli maksimal 12 MB.</small>
         </label>
 
         <div id="qr-crop-stage" class="qr-crop-stage" hidden>
-          <h3>Pilih area QRIS</h3>
-          <p>Tarik titik sudut untuk mengatur panjang dan lebar, titik di sisi untuk mengubah satu arah, atau bagian dalam kotak untuk memindahkannya. Area terpilih yang ditampilkan sebagai QRIS; bagian di luar kotak tetap tersimpan dan bisa dipilih lagi saat gambar diedit.</p>
-          <canvas id="qr-crop-canvas" aria-label="Area pemotongan QRIS"></canvas>
+          <h3>Pilih area QR</h3>
+          <p>Tarik titik sudut untuk mengatur panjang dan lebar, titik di sisi untuk mengubah satu arah, atau bagian dalam kotak untuk memindahkannya. Area terpilih yang ditampilkan sebagai QR; bagian di luar kotak tetap tersimpan dan bisa dipilih lagi saat gambar diedit.</p>
+          <canvas id="qr-crop-canvas" aria-label="Area pemotongan QR"></canvas>
           <div class="qr-crop-actions">
             <button id="qr-crop-reset" class="secondary-button" type="button">Reset area</button>
             <button id="qr-crop-apply" class="primary-button" type="button">Gunakan area terpilih</button>
@@ -63,8 +63,8 @@
 
         <div id="qr-image-preview-wrap" class="qr-image-preview-wrap" hidden>
           <div class="qr-image-preview-content">
-            <p id="qr-image-preview-caption">Pratinjau area QRIS</p>
-            <img id="qr-image-preview" alt="Pratinjau gambar QRIS yang akan disimpan">
+            <p id="qr-image-preview-caption">Pratinjau area QR</p>
+            <img id="qr-image-preview" alt="Pratinjau gambar QR yang akan disimpan">
           </div>
           <button id="qr-image-recrop" class="secondary-button" type="button" hidden>Atur area lagi</button>
         </div>
@@ -72,7 +72,7 @@
 
         <div class="qr-editor-actions">
           <button id="qr-cancel" class="secondary-button" type="button">Batal</button>
-          <button id="qr-save" class="primary-button" type="submit">Simpan QRIS</button>
+          <button id="qr-save" class="primary-button" type="submit">Simpan QR</button>
         </div>
       </form>
     </section>

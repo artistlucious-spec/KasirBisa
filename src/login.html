@@ -18,19 +18,21 @@
       </a>
       <p class="eyebrow">SELAMAT DATANG</p>
       <h1 id="login-title">Masuk ke Kasir Bisa</h1>
-      <p class="login-description">Masuk ke ruang data usaha Anda.</p>
+      <p class="login-description">Masukkan nama pengguna atau nama usaha yang Anda daftarkan, lalu kata sandi.</p>
       <form id="form-login">
-        <label for="nama-pengguna">Nama pengguna atau nomor WhatsApp</label>
+        <label for="nama-pengguna">Nama pengguna atau nama usaha</label>
         <input id="nama-pengguna" name="username" type="text" autocomplete="username" required maxlength="128">
-        <label for="kata-sandi">Password (minimal 12 karakter)</label>
+        <label for="kata-sandi">Kata sandi</label>
         <div class="password-field">
-          <input id="kata-sandi" name="password" type="password" autocomplete="current-password" required minlength="12" maxlength="256">
+          <input id="kata-sandi" name="password" type="password" autocomplete="current-password" required maxlength="256">
           <button id="lihat-kata-sandi" type="button" aria-label="Tampilkan password">Lihat</button>
         </div>
+        <a class="login-whatsapp-link" href="login-whatsapp.html">Lupa kata sandi? Masuk dengan kode WhatsApp</a>
         <button id="tombol-login" class="primary-button" type="submit">Masuk</button>
       </form>
       <p id="pesan-login" class="login-message" role="status" aria-live="polite"></p>
       <p class="login-help">Belum punya akun? <a href="signup.html">Daftar usaha</a></p>
+      <p class="login-help login-guide-link">Perlu bantuan? <a href="cara-masuk.html">Baca panduan masuk dan pendaftaran</a>.</p>
     </section>
   </main>
   <script src="scripts/login.js"></script>
