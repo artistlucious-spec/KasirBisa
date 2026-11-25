@@ -23,7 +23,7 @@
       <a class="header-link" href="index.html">Kasir</a>
       <a class="header-link" href="produk.html">Produk &amp; Stok</a>
       <a class="header-link" href="riwayat.html">Riwayat Transaksi</a>
-      <a class="header-link" href="laporan.html">Laporan Penjualan</a>
+      <a class="header-link" href="pusat-perhatian.html">Pusat Perhatian Toko</a>
       <a class="header-link" href="smart-insight.html">Smart Insight</a>
       <a class="header-link" href="panduan.html">Panduan</a>
       <a class="header-link" href="profile.html">Profil Usaha</a>
@@ -44,12 +44,12 @@
     </section>
 
     <div class="insight-quick-links">
-      <a href="pusat-perhatian.html">Lihat Pusat Perhatian Toko</a>
+      <a href="laporan.html">Lihat Laporan Penjualan</a>
     </div>
     <div id="insight-notice" class="notice" role="status" aria-live="polite"></div>
 
     <section class="insight-focus-panel" aria-labelledby="insight-focus-title">
-      <div><p class="eyebrow">ARAH ANALISIS</p><h2 id="insight-focus-title">Apa yang ingin Anda tingkatkan?</h2><p>Pilih fokus usaha. Sistem tetap memeriksa kondisi penting lainnya secara otomatis.</p></div>
+      <div><p class="eyebrow">ARAH ANALISIS</p><h2 id="insight-focus-title">Apa yang ingin Anda tingkatkan?</h2><p>Pilih fokus untuk menyesuaikan ringkasan dan urutan saran. Sistem tetap memeriksa kondisi penting lainnya.</p></div>
       <div class="insight-focus-options" role="group" aria-label="Fokus analisis">
         <button type="button" class="insight-focus-chip active" data-focus="automatic" aria-pressed="true">✦ Otomatis</button>
         <button type="button" class="insight-focus-chip" data-focus="sales" aria-pressed="false">↗ Tingkatkan penjualan</button>
@@ -60,6 +60,24 @@
       <p id="insight-focus-description" class="insight-focus-description">Kami mencari peluang dan risiko paling penting dari data usaha Anda.</p>
     </section>
 
+    <details class="insight-help">
+      <summary>Pelajari fitur Smart Insight</summary>
+      <div class="insight-help-content">
+        <p><strong>Pilih fokus:</strong> pilih hal yang ingin Anda periksa. Pilihan ini mengubah ringkasan dan urutan saran, bukan data yang dihitung. Sistem tetap memeriksa kondisi penting lainnya.</p>
+        <ul>
+          <li><strong>Otomatis:</strong> dahulukan temuan yang paling perlu diperhatikan.</li>
+          <li><strong>Tingkatkan penjualan:</strong> periksa perubahan penjualan dan langkah yang mungkin membantu.</li>
+          <li><strong>Kelola stok:</strong> lihat produk yang mungkin segera habis.</li>
+          <li><strong>Produk terlaris:</strong> lihat produk yang paling banyak terjual.</li>
+          <li><strong>Produk kurang laku:</strong> cari produk yang belum terjual dalam 30 hari. Pilihan ini memerlukan data transaksi setidaknya 30 hari.</li>
+        </ul>
+        <p><strong>Grafik penjualan:</strong> garis membandingkan nilai penjualan 7 hari sebelumnya dengan 7 hari terakhir. Panah menunjukkan arah perubahan, sedangkan garis putus-putus menandai nilai yang lebih tinggi. Grafik hanya muncul jika data pembanding tersedia.</p>
+        <p><strong>Angka dan saran:</strong> empat kartu di atas menunjukkan penjualan, transaksi, risiko stok, dan produk yang terjual selama 7 hari terakhir. Pada setiap saran, baca judul temuan, tingkat perhatian, bukti angka, lalu tindakan yang disarankan. Saran tidak dijalankan otomatis; periksa kondisi toko sebelum bertindak.</p>
+        <p><strong>Angka total:</strong> ringkasan di bagian bawah menghitung seluruh data yang tersimpan. Karena itu, totalnya bisa lebih besar daripada angka 7 hari.</p>
+        <p><strong>Jam ramai:</strong> analisis ini belum tersedia karena zona waktu toko belum diatur. Jika pesan menyebut belum ada pembanding, berarti data minggu sebelumnya belum cukup untuk dibandingkan.</p>
+      </div>
+    </details>
+
     <section id="api-key-area" class="api-key-area" hidden>
       <strong>Fitur saran cerdas belum diaktifkan.</strong>
       <p>Silakan hubungi pengelola aplikasi jika Anda ingin menggunakan fitur ini.</p>
@@ -68,6 +86,25 @@
 
     <section id="insight-ringkasan" class="insight-summary" aria-live="polite">
       <span class="insight-loader">Menyiapkan analisis...</span>
+    </section>
+
+    <section id="insight-trend" class="insight-trend" aria-labelledby="insight-trend-title" hidden>
+      <div class="insight-trend-heading">
+        <div>
+          <p class="eyebrow">PERBANDINGAN PENJUALAN</p>
+          <h2 id="insight-trend-title">Dua minggu terakhir</h2>
+          <p>Bandingkan 7 hari terakhir dengan 7 hari sebelumnya.</p>
+        </div>
+        <span id="insight-trend-status" class="insight-trend-status"></span>
+      </div>
+      <p id="insight-trend-message" class="insight-trend-message" role="status" hidden></p>
+      <div id="insight-trend-chart-wrap" class="insight-trend-chart-wrap" role="region" aria-label="Grafik penjualan; gulir horizontal jika diperlukan" tabindex="0" hidden>
+        <svg id="insight-trend-chart" class="insight-trend-chart" viewBox="0 0 720 250" role="img"></svg>
+        <div class="insight-trend-values">
+          <div><span>7 hari sebelumnya</span><strong id="insight-trend-previous">Rp0</strong></div>
+          <div><span>7 hari terakhir</span><strong id="insight-trend-current">Rp0</strong></div>
+        </div>
+      </div>
     </section>
 
     <section id="insight-kartu" class="insight-card-grid" aria-label="Ringkasan insight"></section>

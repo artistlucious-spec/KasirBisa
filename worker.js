@@ -1830,9 +1830,10 @@ async function smartInsightApi(request, env, businessId) {
   let trend = { status: "belum_cukup", keterangan: "Belum ada pembanding 7 hari sebelumnya yang memadai." };
   if (countPrevious7 > 0) {
     const delta = totalPrevious7 > 0 ? ((total7 - totalPrevious7) / totalPrevious7) * 100 : null;
+    const roundedDelta = delta === null ? null : Math.round(delta);
     trend = delta === null
       ? { status: "baru_tercatat", keterangan: `Penjualan 7 hari terakhir ${rupiah(total7)}; periode pembanding belum memiliki nilai penjualan.` }
-      : { status: delta >= 10 ? "naik" : delta <= -10 ? "turun" : "stabil", perubahan_persen: Math.round(delta), keterangan: `Penjualan 7 hari terakhir ${rupiah(total7)} dibanding ${rupiah(totalPrevious7)} pada 7 hari sebelumnya (${delta >= 0 ? "+" : ""}${Math.round(delta)}%).` };
+      : { status: roundedDelta >= 10 ? "naik" : roundedDelta <= -10 ? "turun" : "stabil", perubahan_persen: roundedDelta, keterangan: `Penjualan 7 hari terakhir ${rupiah(total7)} dibanding ${rupiah(totalPrevious7)} pada 7 hari sebelumnya (${roundedDelta >= 0 ? "+" : ""}${roundedDelta}%).` };
   }
 
   const facts = {
