@@ -116,10 +116,13 @@ function renderProduk() {
       elemen("span", "stock-badge", `Stok ${produk.stock ?? 0} · ${produk.barcode || "-"}`)
     );
     const aksi = elemen("div", "product-card-actions");
-    const tambah = elemen("button", "add-button", "Tambah");
+    const stokTersedia = Number(produk.stock ?? 0);
+    const stokHabis = !Number.isFinite(stokTersedia) || jumlahDiKeranjang >= stokTersedia;
+    const tambah = elemen("button", "add-button", stokHabis ? "Habis" : "Tambah");
     tambah.type = "button";
+    tambah.disabled = stokHabis;
     tambah.dataset.kode = produk.kode;
-    tambah.setAttribute("aria-label", `Tambah ${produk.nama} ke keranjang`);
+    tambah.setAttribute("aria-label", stokHabis ? `Stok ${produk.nama} habis` : `Tambah ${produk.nama} ke keranjang`);
     aksi.appendChild(tambah);
     if (jumlahDiKeranjang > 0) {
       const kurang = elemen("button", "decrease-button", "Kurangi");

@@ -203,6 +203,7 @@ main { width: min(1280px, 100%); margin: 0 auto; padding: 28px 24px 52px; }
 }
 .decrease-button:hover { background: #e8ebf0; }
 .add-button:hover, .primary-button:hover:not(:disabled) { background: var(--green-dark); }
+.add-button:disabled { background: #a6b5ad; color: #fff; cursor: not-allowed; }
 .empty-products { grid-column: 1 / -1; padding: 30px 12px; color: var(--muted); text-align: center; }
 
 .count-badge {
