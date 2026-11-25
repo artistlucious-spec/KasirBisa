@@ -3,7 +3,7 @@ ADD COLUMN payment_label TEXT NOT NULL DEFAULT '';
 
 UPDATE transactions
 SET payment_label = CASE
-  WHEN payment_method = 'qris' THEN 'QRIS'
+  WHEN payment_method = 'qris' THEN 'QR'
   ELSE 'Tunai'
 END;
 
@@ -28,7 +28,7 @@ INSERT INTO business_payment_qrs (
 SELECT
   'legacy-' || business_id,
   business_id,
-  'QRIS',
+  'QR',
   qris_image,
   qris_enabled,
   COALESCE(updated_at, CURRENT_TIMESTAMP),
