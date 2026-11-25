@@ -25,13 +25,3 @@ document.addEventListener("keydown", (event) => {
 });
 siteMenu.addEventListener("click", (event) => { if (event.target.closest("a, button")) setMenuOpen(false); });
 
-// Badge hanya menghitung notifikasi baru yang belum dibaca.
-const alertBadge = document.getElementById("store-alert-badge");
-if (alertBadge) {
-  fetch("/api/store-alerts").then(response => response.ok ? response.json() : null).then(data => {
-    if (!data) return;
-    const count = Number(data.unread || 0);
-    alertBadge.textContent = count > 99 ? "99+" : String(count);
-    alertBadge.hidden = count < 1;
-  }).catch(() => {});
-}
