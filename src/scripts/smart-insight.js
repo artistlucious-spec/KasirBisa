@@ -174,70 +174,89 @@ function formatStockRiskDetail(risks) {
   const remaining = risks.length - examples.length;
   return `Perlu diperiksa: ${examples.join(" · ")}${remaining > 0 ? ` · dan ${remaining} produk lainnya` : ""}`;
 }
+function insightStorageKey(username) {
+  return `kasirbisa-smart-insight:${encodeURIComponent(username)}`;
+}
+function saveInsightResult(data) {
+  const username = window.kasirSessionData?.username;
+  if (!username || !data?.insight) return;
+  try {
+    sessionStorage.setItem(insightStorageKey(username), JSON.stringify({
+      savedAt: Date.now(),
+      data,
+    }));
+  } catch (error) {
+    console.warn("[SMART_INSIGHT_STORAGE WRITE ERROR]", error);
+  }
+}
+function renderInsightResult(data, restoredAt = null) {
+  const insight = data.insight || {};
+  document.getElementById("insight-ringkasan").innerHTML = `<p>${escapeHtml(insight.ringkasan || "Belum ada ringkasan.")}</p>`;
+  document.getElementById("insight-produk").textContent = insight.produk_terlaris || "Belum tersedia";
+  document.getElementById("insight-stok").textContent = insight.stok_menipis || "Belum tersedia";
+  document.getElementById("insight-jam").textContent = insight.jam_ramai || "Belum tersedia";
+  document.getElementById("insight-saran").textContent = insight.saran_penjualan || "Belum tersedia";
+  renderRecommendations(data.recommendations || []);
+  const cards = Array.isArray(insight.kartu) ? insight.kartu : [];
+  const grid = document.getElementById("insight-kartu"); grid.replaceChildren();
+  for (const card of cards) {
+    const article = document.createElement("article"); article.className = `insight-mini-card ${card.tipe || "info"}`;
+    const title = document.createElement("span"); title.textContent = card.judul || "Ringkasan";
+    const value = document.createElement("strong"); value.textContent = card.isi || "-";
+    article.append(title, value); grid.append(article);
+    if (card.judul === "Risiko stok") {
+      const detail = document.createElement("small");
+      detail.className = "insight-mini-card-detail";
+      detail.textContent = formatStockRiskDetail(data.facts?.risiko_stok);
+      article.append(detail);
+    }
+  }
+  const facts = data.facts || {};
+  renderSalesComparison(facts);
+  document.getElementById("fact-transaksi").textContent = String(facts.jumlah_transaksi || 0);
+  document.getElementById("fact-total").textContent = rupiah(facts.total_penjualan);
+  document.getElementById("fact-produk").textContent = facts.produk_terlaris_7_hari?.[0]?.nama || facts.produk_terlaris?.[0]?.name || "-";
+  document.getElementById("fact-stok").textContent = String((facts.risiko_stok || facts.stok_menipis || []).length);
+  if (data.needs_key) {
+    keyArea.hidden = false;
+    const detail = document.getElementById("insight-setup-detail"); if (detail) detail.textContent = data.setup || "Pengelola dapat mengaktifkan layanan AI.";
+    setNotice("Rekomendasi berbasis data aktif. AI tambahan belum diaktifkan oleh pengelola.", "success");
+  } else if (data.cache_hit) setNotice("Saran AI dari analisis 10 menit terakhir digunakan kembali.", "success");
+  else if (data.recommendations_source === "worker") setNotice(data.detail || "AI tidak tersedia; saran cadangan berbasis data sistem ditampilkan.", "error");
+  else if (data.success) setNotice("Saran AI berhasil dibuat berdasarkan temuan dan data usaha.", "success");
+  else setNotice(data.detail || "Saran cadangan berbasis data sistem ditampilkan.", "error");
+  if (restoredAt) {
+    const timestamp = new Date(restoredAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+    setNotice(`Menampilkan hasil terakhir (${timestamp}); data belum diperbarui. Tekan “Analisis sekarang” untuk memperbarui.`, "success");
+  }
+}
+async function restoreLastInsight() {
+  const session = await window.kasirSessionPromise;
+  if (!session?.authenticated || !session.username) return;
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(insightStorageKey(session.username)) || "null");
+    if (!saved || !Number.isFinite(saved.savedAt) || !saved.data?.insight) return;
+    renderInsightResult(saved.data, saved.savedAt);
+  } catch (error) {
+    console.warn("[SMART_INSIGHT_STORAGE READ ERROR]", error);
+  }
+}
 async function generateInsight() {
   button.disabled = true; button.textContent = "Menganalisis data..."; keyArea.hidden = true;
   setNotice("Membaca transaksi, pergerakan produk, dan kondisi stok...");
-  document.getElementById("insight-ringkasan").textContent = "Analisis sedang disiapkan...";
-  document.getElementById("insight-recommendations").innerHTML = '<p class="empty-state">Menyusun rekomendasi berdasarkan data...</p>';
-  document.getElementById("insight-trend").hidden = false;
-  document.getElementById("insight-trend-chart-wrap").hidden = true;
-  document.getElementById("insight-trend-status").hidden = true;
-  const trendMessage = document.getElementById("insight-trend-message");
-  trendMessage.hidden = false;
-  trendMessage.textContent = "Menyiapkan perbandingan penjualan...";
   try {
     const response = await fetch("/api/smart-insight", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ focus: selectedFocus }) });
     const data = await response.json().catch(() => ({}));
     if (response.status === 401) { window.location.replace("/login.html"); return; }
     if (!response.ok && !data.insight) throw new Error(data.detail || data.error || "Smart Insight tidak dapat diproses.");
-    const insight = data.insight || {};
-    document.getElementById("insight-ringkasan").innerHTML = `<p>${escapeHtml(insight.ringkasan || "Belum ada ringkasan.")}</p>`;
-    document.getElementById("insight-produk").textContent = insight.produk_terlaris || "Belum tersedia";
-    document.getElementById("insight-stok").textContent = insight.stok_menipis || "Belum tersedia";
-    document.getElementById("insight-jam").textContent = insight.jam_ramai || "Belum tersedia";
-    document.getElementById("insight-saran").textContent = insight.saran_penjualan || "Belum tersedia";
-    renderRecommendations(data.recommendations || []);
-    const cards = Array.isArray(insight.kartu) ? insight.kartu : [];
-    const grid = document.getElementById("insight-kartu"); grid.replaceChildren();
-    for (const card of cards) {
-      const article = document.createElement("article"); article.className = `insight-mini-card ${card.tipe || "info"}`;
-      const title = document.createElement("span"); title.textContent = card.judul || "Ringkasan";
-      const value = document.createElement("strong"); value.textContent = card.isi || "-";
-      article.append(title, value); grid.append(article);
-      if (card.judul === "Risiko stok") {
-        const detail = document.createElement("small");
-        detail.className = "insight-mini-card-detail";
-        detail.textContent = formatStockRiskDetail(data.facts?.risiko_stok);
-        article.append(detail);
-      }
-    }
-    const facts = data.facts || {};
-    renderSalesComparison(facts);
-    document.getElementById("fact-transaksi").textContent = String(facts.jumlah_transaksi || 0);
-    document.getElementById("fact-total").textContent = rupiah(facts.total_penjualan);
-    document.getElementById("fact-produk").textContent = facts.produk_terlaris_7_hari?.[0]?.nama || facts.produk_terlaris?.[0]?.name || "-";
-    document.getElementById("fact-stok").textContent = String((facts.risiko_stok || facts.stok_menipis || []).length);
-    if (data.needs_key) {
-      keyArea.hidden = false;
-      const detail = document.getElementById("insight-setup-detail"); if (detail) detail.textContent = data.setup || "Pengelola dapat mengaktifkan layanan AI.";
-      setNotice("Rekomendasi berbasis data aktif. AI tambahan belum diaktifkan oleh pengelola.", "success");
-    } else if (data.cache_hit) setNotice("Saran AI dari analisis 10 menit terakhir digunakan kembali.", "success");
-    else if (data.recommendations_source === "worker") setNotice(data.detail || "AI tidak tersedia; saran cadangan berbasis data sistem ditampilkan.", "error");
-    else if (data.success) setNotice("Saran AI berhasil dibuat berdasarkan temuan dan data usaha.", "success");
-    else setNotice(data.detail || "Saran cadangan berbasis data sistem ditampilkan.", "error");
+    saveInsightResult(data);
+    renderInsightResult(data);
   } catch (error) {
     setNotice(error.message, "error");
-    document.getElementById("insight-ringkasan").textContent = "Smart Insight belum dapat dimuat.";
-    document.getElementById("insight-trend").hidden = false;
-    document.getElementById("insight-trend-chart-wrap").hidden = true;
-    document.getElementById("insight-trend-status").hidden = true;
-    const trendMessage = document.getElementById("insight-trend-message");
-    trendMessage.hidden = false;
-    trendMessage.textContent = "Grafik perbandingan penjualan belum dapat dimuat.";
-    renderRecommendations([]);
   } finally { button.disabled = false; button.innerHTML = '<span aria-hidden="true">✦</span> Analisis sekarang'; }
 }
 focusButtons.forEach((item) => item.addEventListener("click", () => setFocus(item.dataset.focus)));
 button.addEventListener("click", generateInsight);
 for (const item of focusButtons) { const active = item.dataset.focus === selectedFocus; item.classList.toggle("active", active); item.setAttribute("aria-pressed", String(active)); }
 focusDescription.textContent = focusDescriptions[selectedFocus] || focusDescriptions.automatic;
+restoreLastInsight().catch((error) => console.error("[SMART_INSIGHT_RESTORE ERROR]", error));
