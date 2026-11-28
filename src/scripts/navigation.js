@@ -9,6 +9,13 @@ function setMenuOpen(open) {
 }
 
 const currentPage = location.pathname.split("/").pop() || "index.html";
+if (siteMenu && !siteMenu.querySelector('a[href="dashboard.html"]')) {
+  const dashboardLink = document.createElement("a");
+  dashboardLink.className = "header-link";
+  dashboardLink.href = "dashboard.html";
+  dashboardLink.textContent = "Dashboard";
+  siteMenu.insertBefore(dashboardLink, siteMenu.firstElementChild);
+}
 siteMenu.querySelectorAll("a[href]").forEach((link) => {
   if (link.getAttribute("href") === currentPage || (currentPage === "rekap.html" && link.getAttribute("href") === "riwayat.html")) {
     link.classList.add("active");

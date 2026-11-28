@@ -62,7 +62,7 @@ form.addEventListener("submit", async (event) => {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || "Kode tidak benar atau sudah kedaluwarsa.");
-    window.location.replace("index.html");
+    window.location.replace("dashboard.html");
   } catch (error) {
     showMessage(error.message);
     submitButton.disabled = false;

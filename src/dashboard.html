@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1565c0">
+  <title>Dashboard - Kasir Bisa</title>
+  <script src="scripts/auth-guard.js"></script>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="icon" type="image/png" href="icon/Favicon.png">
+</head>
+<body class="halaman-dashboard">
+  <header class="site-header">
+    <a class="brand" href="dashboard.html" aria-label="Dashboard Kasir Bisa">
+      <img class="brand-logo" src="icon/Favicon.png" alt="" aria-hidden="true">
+      <span><strong>Kasir Bisa</strong><small>Asisten usaha Anda</small></span>
+    </a>
+    <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Buka menu" aria-controls="site-menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <nav id="site-menu" class="header-nav" aria-label="Navigasi utama" hidden>
+      <a class="header-link" href="index.html">Kasir</a>
+      <a class="header-link" href="produk.html">Produk &amp; Stok</a>
+      <a class="header-link" href="riwayat.html">Riwayat Transaksi</a>
+      <a class="header-link" href="laporan.html">Laporan Penjualan</a>
+      <a class="header-link" href="pusat-perhatian.html">Pusat Perhatian Toko</a>
+      <a class="header-link" href="smart-insight.html">Smart Insight</a>
+      <a class="header-link" href="panduan.html">Panduan</a>
+      <a class="header-link" href="profile.html">Profil Usaha</a>
+      <button id="tombol-keluar" class="header-link logout-button" type="button">Keluar</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="dashboard-hero">
+      <div>
+        <p class="eyebrow">RINGKASAN USAHA</p>
+        <h1 id="dashboard-greeting">Selamat datang</h1>
+        <p id="dashboard-date" class="dashboard-date"></p>
+      </div>
+      <a class="primary-button dashboard-primary-action" href="index.html">Buka Kasir</a>
+    </section>
+
+    <div id="dashboard-notice" class="notice" role="status" aria-live="polite"></div>
+
+    <section class="dashboard-stats" aria-label="Ringkasan hari ini">
+      <article class="dashboard-stat-card">
+        <span class="dashboard-stat-icon blue" aria-hidden="true">Rp</span>
+        <div><span>Penjualan hari ini</span><strong id="dashboard-sales">Rp0</strong></div>
+      </article>
+      <article class="dashboard-stat-card">
+        <span class="dashboard-stat-icon green" aria-hidden="true">TX</span>
+        <div><span>Jumlah transaksi</span><strong id="dashboard-transactions">0</strong></div>
+      </article>
+      <article class="dashboard-stat-card">
+        <span class="dashboard-stat-icon amber" aria-hidden="true">!</span>
+        <div><span>Stok menipis</span><strong id="dashboard-low-stock">0 produk</strong></div>
+      </article>
+      <article class="dashboard-stat-card">
+        <span class="dashboard-stat-icon red" aria-hidden="true">●</span>
+        <div><span>Perhatian aktif</span><strong id="dashboard-alerts">0</strong></div>
+      </article>
+    </section>
+
+    <section class="dashboard-grid">
+      <article class="dashboard-panel dashboard-sales-panel">
+        <div class="dashboard-panel-heading">
+          <div><p class="eyebrow">7 HARI TERAKHIR</p><h2>Penjualan Harian</h2></div>
+          <a class="text-button" href="laporan.html">Lihat laporan</a>
+        </div>
+        <div id="dashboard-chart" class="dashboard-chart" role="img" aria-label="Grafik penjualan tujuh hari terakhir"></div>
+      </article>
+
+      <article class="dashboard-panel">
+        <div class="dashboard-panel-heading">
+          <div><p class="eyebrow">PRODUK</p><h2>Produk Terlaris</h2></div>
+          <a class="text-button" href="laporan.html">Lihat semua</a>
+        </div>
+        <div id="dashboard-top-products" class="dashboard-list"></div>
+      </article>
+
+      <article class="dashboard-panel">
+        <div class="dashboard-panel-heading">
+          <div><p class="eyebrow">PERSEDIAAN</p><h2>Stok Menipis</h2></div>
+          <a class="text-button" href="produk.html">Kelola stok</a>
+        </div>
+        <div id="dashboard-low-stock-list" class="dashboard-list"></div>
+      </article>
+
+      <article class="dashboard-panel">
+        <div class="dashboard-panel-heading">
+          <div><p class="eyebrow">TINDAKAN USAHA</p><h2>Pusat Perhatian</h2></div>
+          <a class="text-button" href="pusat-perhatian.html">Lihat semua</a>
+        </div>
+        <div id="dashboard-alert-list" class="dashboard-list"></div>
+      </article>
+    </section>
+
+    <section class="dashboard-actions" aria-label="Menu cepat">
+      <a href="index.html"><span aria-hidden="true">＋</span><strong>Transaksi Baru</strong><small>Mulai penjualan</small></a>
+      <a href="produk.html"><span aria-hidden="true">▣</span><strong>Kelola Produk</strong><small>Tambah atau ubah stok</small></a>
+      <a href="riwayat.html"><span aria-hidden="true">↻</span><strong>Riwayat</strong><small>Lihat transaksi lama</small></a>
+      <a href="smart-insight.html"><span aria-hidden="true">✦</span><strong>Smart Insight</strong><small>Analisis usaha</small></a>
+    </section>
+  </main>
+
+  <script src="scripts/navigation.js"></script>
+  <script src="scripts/dashboard.js"></script>
+</body>
+</html>

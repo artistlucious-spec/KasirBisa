@@ -34,7 +34,7 @@ async function checkExistingSession() {
     });
     const data = await response.json().catch(() => ({}));
     if (response.ok && data.authenticated) {
-      window.location.replace("index.html");
+      window.location.replace("dashboard.html");
       return;
     }
     if (!response.ok) showMessage(data.error || "Login belum dapat digunakan. Hubungi administrator.");
@@ -64,7 +64,7 @@ form.addEventListener("submit", async (event) => {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || "Login gagal.");
-    window.location.replace("index.html");
+    window.location.replace("dashboard.html");
   } catch (error) {
     showMessage(error.message);
     submitButton.disabled = false;
