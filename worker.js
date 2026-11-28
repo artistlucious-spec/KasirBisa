@@ -1740,7 +1740,7 @@ function buildInsightSummary(facts, focus) {
 
 const SMART_INSIGHT_CACHE_TTL_SECONDS = 600;
 const SMART_INSIGHT_MAX_PROMPT_CHARS = 6000;
-const SMART_INSIGHT_MAX_OUTPUT_TOKENS = 120;
+const SMART_INSIGHT_MAX_OUTPUT_TOKENS = 80;
 
 function clipInsightText(value, maxLength) {
   return String(value ?? "").slice(0, maxLength);
@@ -1938,10 +1938,8 @@ async function smartInsightApi(request, env, businessId) {
   const compactContext = buildCompactInsightContext(facts, recommendations);
   const prompt = `Anda adalah pendamping usaha mikro Indonesia. Gunakan bahasa Indonesia yang sederhana, hangat, tidak menggurui, dan langsung bisa dilakukan.
 Fokus pemilik: ${focus}. Prioritaskan rekomendasi yang relevan dengan fokus tersebut, tetapi jangan abaikan risiko stok yang mendesak.
-Temuan dan bukti dari rekomendasi sistem adalah fakta. Berikan satu saran AI yang lebih spesifik dan berguna untuk temuan prioritas pertama; jangan sekadar menyalin tindakan sistem. Jangan mengarang angka, nama produk, harga modal, laba, maupun jam ramai. Jangan menyarankan diskon/harga tanpa data margin.
-Tindakan harus realistis, singkat, dan dapat dilakukan pemilik, bukan nasihat umum. Keluarkan hanya dua baris teks biasa tanpa JSON atau markdown:
-Tindakan: [satu saran maksimal 180 karakter]
-Alasan: [alasan maksimal 100 karakter]
+Temuan dan bukti dari rekomendasi sistem adalah fakta. Berikan satu saran AI yang spesifik dan berguna untuk temuan prioritas pertama; jangan sekadar menyalin tindakan sistem. Jangan mengarang angka, nama produk, harga modal, laba, maupun jam ramai. Jangan menyarankan diskon/harga tanpa data margin.
+Tulis hanya satu kalimat tindakan praktis, maksimal 25 kata. Jangan tulis label seperti "Tindakan:", jangan beri alasan, pembuka, atau format JSON.
 FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
   if (prompt.length > SMART_INSIGHT_MAX_PROMPT_CHARS) {
     console.warn("[HELIPOD INSIGHT INPUT LIMIT]", { businessId, promptChars: prompt.length });
@@ -2046,10 +2044,19 @@ FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
       generatedItem?.tindakan,
       generatedItem?.action,
     ].find((value) => typeof value === "string" && value.trim());
-    const generatedAction = structuredAction
-      || responseText.match(/\*{0,2}\s*(?:tindakan|saran(?: utama)?)\s*\*{0,2}\s*:\s*([\s\S]*?)(?=\n\s*\*{0,2}\s*alasan\s*\*{0,2}\s*:|$)/i)?.[1]
-      || (/^[\[{]/.test(responseText) ? "" : responseText);
-    if (!candidates.length || typeof generatedAction !== "string" || !generatedAction.trim()) {
+    const labeledAction = responseText.match(/\*{0,2}\s*(?:tindakan|saran(?: utama)?)\s*\*{0,2}\s*:\s*([\s\S]*?)(?=\n\s*\*{0,2}\s*alasan\s*\*{0,2}\s*:|$)/i);
+    const generatedAction = structuredAction ?? (labeledAction
+      ? labeledAction[1]
+      : (/^[\[{]/.test(responseText) ? "" : responseText));
+    const cleanAction = typeof generatedAction === "string"
+      ? generatedAction.replace(/^\s*\*{0,2}\s*(?:tindakan|saran(?: utama)?)\s*\*{0,2}\s*:\s*/i, "").replace(/\s+/g, " ").trim()
+      : "";
+    if (!candidates.length || cleanAction.length < 12) {
+      console.warn("[HELIPOD INSIGHT EMPTY OUTPUT]", {
+        businessId,
+        finishReason: providerResponse.choices?.[0]?.finish_reason || "unknown",
+        outputChars: responseText.length,
+      });
       return json({
         success: false,
         error: "AI belum memberikan saran yang bisa digunakan.",
@@ -2063,7 +2070,7 @@ FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
     }
     const aiRecommendations = [{
       ...candidates[0],
-      action: clipInsightText(generatedAction.trim(), 180),
+      action: clipInsightText(cleanAction, 180),
       reason: typeof generated?.alasan === "string"
         ? clipInsightText(generated.alasan.trim(), 100)
         : typeof generatedItem?.alasan === "string"
