@@ -1740,7 +1740,7 @@ function buildInsightSummary(facts, focus) {
 
 const SMART_INSIGHT_CACHE_TTL_SECONDS = 600;
 const SMART_INSIGHT_MAX_PROMPT_CHARS = 6000;
-const SMART_INSIGHT_MAX_OUTPUT_TOKENS = 200;
+const SMART_INSIGHT_MAX_OUTPUT_TOKENS = 400;
 
 function clipInsightText(value, maxLength) {
   return String(value ?? "").slice(0, maxLength);
@@ -1940,8 +1940,8 @@ async function smartInsightApi(request, env, businessId) {
 Fokus pemilik: ${focus}. Prioritaskan rekomendasi yang relevan dengan fokus tersebut, tetapi jangan abaikan risiko stok yang mendesak.
 Temuan dan bukti dari rekomendasi sistem adalah fakta. Berikan solusi yang membantu pemilik mengambil keputusan, bukan mengulang peringatan atau menyuruh melakukan tindakan yang sudah jelas.
 Sebutkan langkah pemeriksaan yang konkret, tindakan bersyarat sesuai hasil pemeriksaan, dan hal yang perlu dipantau setelahnya. Gunakan angka yang tersedia sebagai acuan; jangan mengarang angka, nama produk, harga modal, laba, waktu pemasok, atau jam ramai. Jangan menyarankan diskon/harga tanpa data margin.
-Untuk stok habis/menipis: jelaskan arti angka penjualan bagi keputusan pemilik, sarankan memeriksa apakah pelanggan masih mencari produk, lalu berikan tindakan bersyarat dan hal yang perlu dipantau. Jika permintaan masih ada, gunakan laju penjualan 7 hari sebagai acuan restok bertahap; jangan menyuruh langsung membeli tanpa mempertimbangkan permintaan. Untuk penjualan turun: jelaskan apa yang perlu diperiksa sebelum memilih tindakan dan bagaimana mengukur hasilnya.
-Tulis seperti sedang berbicara langsung dengan pemilik usaha: hangat, jelas, dan tidak kikir. Jangan jawab pendek seperti "segera belanja stok". Berikan 2-3 kalimat (sekitar 35-55 kata, maksimal 360 karakter) yang menjelaskan alasan, langkah konkret, dan tindak lanjut berdasarkan fakta. Jangan tulis label seperti "Tindakan:", pembuka basa-basi, atau format JSON.
+Untuk stok habis/menipis: jelaskan arti angka penjualan dan stok bagi keputusan pemilik, apa yang perlu dicek (misalnya permintaan pelanggan atau catatan penjualan), tindakan bersyarat jika permintaan masih ada, dan cara memantau hasilnya. Gunakan laju penjualan 7 hari sebagai acuan restok bertahap; jangan menyuruh langsung membeli tanpa mempertimbangkan permintaan. Untuk penjualan turun: jelaskan kemungkinan yang bisa diperiksa sebelum memilih tindakan dan bagaimana mengukur hasilnya.
+Tulis seperti sedang berbicara langsung dengan pemilik usaha: hangat, jelas, dan membantu mengambil keputusan. Jangan jawab pendek seperti "Mie Sedap Goreng laku" atau "segera belanja stok". Tulis tepat 3 kalimat, sekitar 50-70 kata (maksimal 500 karakter): (1) makna bukti yang ada, (2) pemeriksaan dan langkah yang disarankan dengan kondisi yang jelas, (3) hal yang perlu dipantau berikutnya. Gunakan nama produk serta angka yang tersedia. Jangan mengarang sebab, angka, harga, laba, atau waktu pemasok. Jangan tulis label, pembuka basa-basi, atau format JSON.
 FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
   if (prompt.length > SMART_INSIGHT_MAX_PROMPT_CHARS) {
     console.warn("[HELIPOD INSIGHT INPUT LIMIT]", { businessId, promptChars: prompt.length });
@@ -2072,7 +2072,7 @@ FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
     }
     const aiRecommendations = [{
       ...candidates[0],
-      action: clipInsightText(cleanAction, 360),
+      action: clipInsightText(cleanAction, 500),
       reason: typeof generated?.alasan === "string"
         ? clipInsightText(generated.alasan.trim(), 100)
         : typeof generatedItem?.alasan === "string"
