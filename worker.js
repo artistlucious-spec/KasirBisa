@@ -1740,7 +1740,7 @@ function buildInsightSummary(facts, focus) {
 
 const SMART_INSIGHT_CACHE_TTL_SECONDS = 600;
 const SMART_INSIGHT_MAX_PROMPT_CHARS = 6000;
-const SMART_INSIGHT_MAX_OUTPUT_TOKENS = 250;
+const SMART_INSIGHT_MAX_OUTPUT_TOKENS = 200;
 
 function clipInsightText(value, maxLength) {
   return String(value ?? "").slice(0, maxLength);
@@ -1776,7 +1776,7 @@ function buildCompactInsightContext(facts, recommendations) {
         transaksi_bersama: item.transaksi_bersama,
       })),
     },
-    recommendations: recommendations.slice(0, 2).map((item) => ({
+    recommendations: recommendations.slice(0, 1).map((item) => ({
       priority: item.priority,
       title: clipInsightText(item.title, 80),
       evidence: clipInsightText(item.evidence, 120),
@@ -1938,8 +1938,8 @@ async function smartInsightApi(request, env, businessId) {
   const compactContext = buildCompactInsightContext(facts, recommendations);
   const prompt = `Anda adalah pendamping usaha mikro Indonesia. Gunakan bahasa Indonesia yang sederhana, hangat, tidak menggurui, dan langsung bisa dilakukan.
 Fokus pemilik: ${focus}. Prioritaskan rekomendasi yang relevan dengan fokus tersebut, tetapi jangan abaikan risiko stok yang mendesak.
-Temuan dan bukti dari rekomendasi sistem adalah fakta. Tindakan sistem hanya referensi; berikan saran AI yang lebih spesifik dan berguna, bukan sekadar menyalinnya. Jangan mengarang angka, nama produk, harga modal, laba, maupun jam ramai. Jangan menyarankan diskon/harga tanpa data margin.
-Buat tepat ${compactContext.recommendations.length} tindakan AI, satu untuk tiap rekomendasi sistem dan dalam urutan yang sama. Tindakan harus realistis, singkat, serta bisa dilakukan pemilik; hindari nasihat umum. Kembalikan JSON valid: {"ringkasan":"maksimal 2 kalimat, 160 karakter", "rekomendasi":[{"tindakan":"maksimal 160 karakter","alasan":"maksimal 100 karakter"}]}.
+Temuan dan bukti dari rekomendasi sistem adalah fakta. Berikan satu saran AI yang lebih spesifik dan berguna untuk temuan prioritas pertama; jangan sekadar menyalin tindakan sistem. Jangan mengarang angka, nama produk, harga modal, laba, maupun jam ramai. Jangan menyarankan diskon/harga tanpa data margin.
+Tindakan harus realistis, singkat, dan dapat dilakukan pemilik, bukan nasihat umum. Kembalikan JSON valid: {"ringkasan":"maksimal 2 kalimat, 160 karakter", "tindakan":"satu saran, maksimal 180 karakter", "alasan":"maksimal 100 karakter"}.
 FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
   if (prompt.length > SMART_INSIGHT_MAX_PROMPT_CHARS) {
     console.warn("[HELIPOD INSIGHT INPUT LIMIT]", { businessId, promptChars: prompt.length });
@@ -1963,7 +1963,7 @@ FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
       const cachedResponse = await cache.match(cacheKey);
       if (cachedResponse) {
         const cachedInsight = await cachedResponse.json();
-        const candidates = recommendations.slice(0, 2);
+        const candidates = recommendations.slice(0, 1);
         if (typeof cachedInsight.ringkasan === "string"
           && Array.isArray(cachedInsight.recommendations)
           && cachedInsight.recommendations.length === candidates.length
@@ -2028,15 +2028,12 @@ FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
       }, response.status === 429 || response.status >= 500 ? 503 : 502);
     }
     const generated = parseAiJson(providerResponse.choices?.[0]?.message?.content || "") || {};
-    const candidates = recommendations.slice(0, 2);
-    const generatedRecommendations = Array.isArray(generated.rekomendasi) ? generated.rekomendasi : [];
-    const validAiRecommendations = candidates.length > 0
-      && generatedRecommendations.length === candidates.length
-      && generatedRecommendations.every((item) =>
-        typeof item?.tindakan === "string" && item.tindakan.trim().length > 0 && item.tindakan.length <= 160
-        && typeof item?.alasan === "string" && item.alasan.trim().length > 0 && item.alasan.length <= 100
-      );
-    if (!validAiRecommendations) {
+    const candidates = recommendations.slice(0, 1);
+    const generatedAction = typeof generated.tindakan === "string"
+      ? generated.tindakan
+      : generated.saran_penjualan;
+    if (!candidates.length || typeof generatedAction !== "string"
+      || !generatedAction.trim() || generatedAction.length > 180) {
       return json({
         success: false,
         error: "AI belum memberikan saran yang bisa digunakan.",
@@ -2048,17 +2045,19 @@ FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
         focus,
       });
     }
-    const aiRecommendations = candidates.map((item, index) => ({
-      ...item,
-      action: generatedRecommendations[index].tindakan.trim(),
-      reason: generatedRecommendations[index].alasan.trim(),
-    }));
+    const aiRecommendations = [{
+      ...candidates[0],
+      action: generatedAction.trim(),
+      reason: typeof generated.alasan === "string" && generated.alasan.trim().length <= 100
+        ? generated.alasan.trim()
+        : candidates[0].reason,
+    }];
     const safeInsight = {
       ...fallback,
       ringkasan: typeof generated.ringkasan === "string" && generated.ringkasan.length <= 180 ? generated.ringkasan : fallback.ringkasan,
       saran_penjualan: aiRecommendations[0]?.action || fallback.saran_penjualan,
     };
-    if (cache && cacheKey && typeof generated.ringkasan === "string") {
+    if (cache && cacheKey) {
       try {
         await cache.put(cacheKey, new Response(JSON.stringify({
           ringkasan: safeInsight.ringkasan,
