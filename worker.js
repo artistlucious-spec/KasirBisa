@@ -1740,7 +1740,7 @@ function buildInsightSummary(facts, focus) {
 
 const SMART_INSIGHT_CACHE_TTL_SECONDS = 600;
 const SMART_INSIGHT_MAX_PROMPT_CHARS = 6000;
-const SMART_INSIGHT_MAX_OUTPUT_TOKENS = 200;
+const SMART_INSIGHT_MAX_OUTPUT_TOKENS = 120;
 
 function clipInsightText(value, maxLength) {
   return String(value ?? "").slice(0, maxLength);
@@ -1939,7 +1939,9 @@ async function smartInsightApi(request, env, businessId) {
   const prompt = `Anda adalah pendamping usaha mikro Indonesia. Gunakan bahasa Indonesia yang sederhana, hangat, tidak menggurui, dan langsung bisa dilakukan.
 Fokus pemilik: ${focus}. Prioritaskan rekomendasi yang relevan dengan fokus tersebut, tetapi jangan abaikan risiko stok yang mendesak.
 Temuan dan bukti dari rekomendasi sistem adalah fakta. Berikan satu saran AI yang lebih spesifik dan berguna untuk temuan prioritas pertama; jangan sekadar menyalin tindakan sistem. Jangan mengarang angka, nama produk, harga modal, laba, maupun jam ramai. Jangan menyarankan diskon/harga tanpa data margin.
-Tindakan harus realistis, singkat, dan dapat dilakukan pemilik, bukan nasihat umum. Kembalikan JSON valid: {"ringkasan":"maksimal 2 kalimat, 160 karakter", "tindakan":"satu saran, maksimal 180 karakter", "alasan":"maksimal 100 karakter"}.
+Tindakan harus realistis, singkat, dan dapat dilakukan pemilik, bukan nasihat umum. Keluarkan hanya dua baris teks biasa tanpa JSON atau markdown:
+Tindakan: [satu saran maksimal 180 karakter]
+Alasan: [alasan maksimal 100 karakter]
 FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
   if (prompt.length > SMART_INSIGHT_MAX_PROMPT_CHARS) {
     console.warn("[HELIPOD INSIGHT INPUT LIMIT]", { businessId, promptChars: prompt.length });
@@ -2027,13 +2029,27 @@ FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
         focus
       }, response.status === 429 || response.status >= 500 ? 503 : 502);
     }
-    const generated = parseAiJson(providerResponse.choices?.[0]?.message?.content || "") || {};
+    const messageContent = providerResponse.choices?.[0]?.message?.content;
+    const responseText = (typeof messageContent === "string"
+      ? messageContent
+      : Array.isArray(messageContent)
+        ? messageContent.map((part) => typeof part === "string" ? part : part?.text || "").join("\n")
+        : "").replace(/```(?:json|text)?/gi, "").replace(/```/g, "").trim();
+    const generated = parseAiJson(responseText);
     const candidates = recommendations.slice(0, 1);
-    const generatedAction = typeof generated.tindakan === "string"
-      ? generated.tindakan
-      : generated.saran_penjualan;
-    if (!candidates.length || typeof generatedAction !== "string"
-      || !generatedAction.trim() || generatedAction.length > 180) {
+    const generatedItem = Array.isArray(generated?.rekomendasi) ? generated.rekomendasi[0] : null;
+    const structuredAction = [
+      generated?.tindakan,
+      generated?.saran_penjualan,
+      generated?.action,
+      generated?.saran,
+      generatedItem?.tindakan,
+      generatedItem?.action,
+    ].find((value) => typeof value === "string" && value.trim());
+    const generatedAction = structuredAction
+      || responseText.match(/\*{0,2}\s*(?:tindakan|saran(?: utama)?)\s*\*{0,2}\s*:\s*([\s\S]*?)(?=\n\s*\*{0,2}\s*alasan\s*\*{0,2}\s*:|$)/i)?.[1]
+      || (/^[\[{]/.test(responseText) ? "" : responseText);
+    if (!candidates.length || typeof generatedAction !== "string" || !generatedAction.trim()) {
       return json({
         success: false,
         error: "AI belum memberikan saran yang bisa digunakan.",
@@ -2047,14 +2063,15 @@ FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
     }
     const aiRecommendations = [{
       ...candidates[0],
-      action: generatedAction.trim(),
-      reason: typeof generated.alasan === "string" && generated.alasan.trim().length <= 100
-        ? generated.alasan.trim()
-        : candidates[0].reason,
+      action: clipInsightText(generatedAction.trim(), 180),
+      reason: typeof generated?.alasan === "string"
+        ? clipInsightText(generated.alasan.trim(), 100)
+        : typeof generatedItem?.alasan === "string"
+          ? clipInsightText(generatedItem.alasan.trim(), 100)
+          : responseText.match(/(?:^|\n)\s*\*{0,2}\s*alasan\s*\*{0,2}\s*:\s*([^\n]+)/i)?.[1]?.trim() || "",
     }];
     const safeInsight = {
       ...fallback,
-      ringkasan: typeof generated.ringkasan === "string" && generated.ringkasan.length <= 180 ? generated.ringkasan : fallback.ringkasan,
       saran_penjualan: aiRecommendations[0]?.action || fallback.saran_penjualan,
     };
     if (cache && cacheKey) {
