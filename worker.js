@@ -1740,7 +1740,7 @@ function buildInsightSummary(facts, focus) {
 
 const SMART_INSIGHT_CACHE_TTL_SECONDS = 600;
 const SMART_INSIGHT_MAX_PROMPT_CHARS = 6000;
-const SMART_INSIGHT_MAX_OUTPUT_TOKENS = 400;
+const SMART_INSIGHT_MAX_OUTPUT_TOKENS = 1600;
 
 function clipInsightText(value, maxLength) {
   return String(value ?? "").slice(0, maxLength);
@@ -1941,7 +1941,7 @@ Fokus pemilik: ${focus}. Prioritaskan rekomendasi yang relevan dengan fokus ters
 Temuan dan bukti dari rekomendasi sistem adalah fakta. Berikan solusi yang membantu pemilik mengambil keputusan, bukan mengulang peringatan atau menyuruh melakukan tindakan yang sudah jelas.
 Sebutkan langkah pemeriksaan yang konkret, tindakan bersyarat sesuai hasil pemeriksaan, dan hal yang perlu dipantau setelahnya. Gunakan angka yang tersedia sebagai acuan; jangan mengarang angka, nama produk, harga modal, laba, waktu pemasok, atau jam ramai. Jangan menyarankan diskon/harga tanpa data margin.
 Untuk stok habis/menipis: jelaskan arti angka penjualan dan stok bagi keputusan pemilik, apa yang perlu dicek (misalnya permintaan pelanggan atau catatan penjualan), tindakan bersyarat jika permintaan masih ada, dan cara memantau hasilnya. Gunakan laju penjualan 7 hari sebagai acuan restok bertahap; jangan menyuruh langsung membeli tanpa mempertimbangkan permintaan. Untuk penjualan turun: jelaskan kemungkinan yang bisa diperiksa sebelum memilih tindakan dan bagaimana mengukur hasilnya.
-Tulis seperti sedang berbicara langsung dengan pemilik usaha: hangat, jelas, dan membantu mengambil keputusan. Jangan jawab pendek seperti "Mie Sedap Goreng laku" atau "segera belanja stok". Tulis tepat 3 kalimat, sekitar 50-70 kata (maksimal 500 karakter): (1) makna bukti yang ada, (2) pemeriksaan dan langkah yang disarankan dengan kondisi yang jelas, (3) hal yang perlu dipantau berikutnya. Gunakan nama produk serta angka yang tersedia. Jangan mengarang sebab, angka, harga, laba, atau waktu pemasok. Jangan tulis label, pembuka basa-basi, atau format JSON.
+Tulis seperti sedang berbicara langsung dengan pemilik usaha: hangat, jelas, dan membantu mengambil keputusan. Jangan jawab pendek seperti "Mie Sedap Goreng laku" atau "segera belanja stok". Tulis 300-500 kata dalam 4-6 paragraf pendek. Bahas makna bukti, apa yang masih belum diketahui, langkah pemeriksaan yang konkret, beberapa pilihan tindakan bersyarat, serta cara mengevaluasi hasilnya. Gunakan nama produk dan angka yang tersedia; berikan contoh langkah yang relevan dengan usaha kecil tanpa mengarang fakta. Jangan mengulang ide atau menambah basa-basi untuk mengejar panjang. Jangan mengarang sebab, angka, harga, laba, atau waktu pemasok. Pisahkan paragraf dengan satu baris kosong. Jangan tulis label atau format JSON.
 FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
   if (prompt.length > SMART_INSIGHT_MAX_PROMPT_CHARS) {
     console.warn("[HELIPOD INSIGHT INPUT LIMIT]", { businessId, promptChars: prompt.length });
@@ -2051,7 +2051,12 @@ FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
       ? labeledAction[1]
       : (/^[\[{]/.test(responseText) ? "" : responseText));
     const cleanAction = typeof generatedAction === "string"
-      ? generatedAction.replace(/^\s*\*{0,2}\s*(?:tindakan|saran(?: utama)?)\s*\*{0,2}\s*:\s*/i, "").replace(/\s+/g, " ").trim()
+      ? generatedAction
+        .replace(/^\s*\*{0,2}\s*(?:tindakan|saran(?: utama)?)\s*\*{0,2}\s*:\s*/i, "")
+        .replace(/\r\n?/g, "\n")
+        .replace(/[ \t]+/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim()
       : "";
     if (!candidates.length || cleanAction.length < 12) {
       console.warn("[HELIPOD INSIGHT EMPTY OUTPUT]", {
@@ -2072,7 +2077,7 @@ FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
     }
     const aiRecommendations = [{
       ...candidates[0],
-      action: clipInsightText(cleanAction, 500),
+      action: clipInsightText(cleanAction, 5000),
       reason: typeof generated?.alasan === "string"
         ? clipInsightText(generated.alasan.trim(), 100)
         : typeof generatedItem?.alasan === "string"
