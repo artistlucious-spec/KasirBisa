@@ -1740,7 +1740,7 @@ function buildInsightSummary(facts, focus) {
 
 const SMART_INSIGHT_CACHE_TTL_SECONDS = 600;
 const SMART_INSIGHT_MAX_PROMPT_CHARS = 6000;
-const SMART_INSIGHT_MAX_OUTPUT_TOKENS = 80;
+const SMART_INSIGHT_MAX_OUTPUT_TOKENS = 120;
 
 function clipInsightText(value, maxLength) {
   return String(value ?? "").slice(0, maxLength);
@@ -1938,8 +1938,10 @@ async function smartInsightApi(request, env, businessId) {
   const compactContext = buildCompactInsightContext(facts, recommendations);
   const prompt = `Anda adalah pendamping usaha mikro Indonesia. Gunakan bahasa Indonesia yang sederhana, hangat, tidak menggurui, dan langsung bisa dilakukan.
 Fokus pemilik: ${focus}. Prioritaskan rekomendasi yang relevan dengan fokus tersebut, tetapi jangan abaikan risiko stok yang mendesak.
-Temuan dan bukti dari rekomendasi sistem adalah fakta. Berikan satu saran AI yang spesifik dan berguna untuk temuan prioritas pertama; jangan sekadar menyalin tindakan sistem. Jangan mengarang angka, nama produk, harga modal, laba, maupun jam ramai. Jangan menyarankan diskon/harga tanpa data margin.
-Tulis hanya satu kalimat tindakan praktis, maksimal 25 kata. Jangan tulis label seperti "Tindakan:", jangan beri alasan, pembuka, atau format JSON.
+Temuan dan bukti dari rekomendasi sistem adalah fakta. Berikan solusi yang membantu pemilik mengambil keputusan, bukan mengulang peringatan atau menyuruh melakukan tindakan yang sudah jelas.
+Sebutkan langkah pemeriksaan yang konkret, tindakan bersyarat sesuai hasil pemeriksaan, dan hal yang perlu dipantau setelahnya. Gunakan angka yang tersedia sebagai acuan; jangan mengarang angka, nama produk, harga modal, laba, waktu pemasok, atau jam ramai. Jangan menyarankan diskon/harga tanpa data margin.
+Untuk stok habis/menipis: sarankan memeriksa apakah pelanggan masih mencari produk; jika permintaan ada, rencanakan restok bertahap dengan laju penjualan 7 hari sebagai acuan dan pantau stok/penjualan setelah restok. Untuk penjualan turun: sarankan memeriksa penyebab sebelum memilih tindakan dan ukur perubahan setelahnya.
+Tulis hanya 1-2 kalimat, maksimal 260 karakter. Jangan tulis label seperti "Tindakan:", pembuka, atau format JSON.
 FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
   if (prompt.length > SMART_INSIGHT_MAX_PROMPT_CHARS) {
     console.warn("[HELIPOD INSIGHT INPUT LIMIT]", { businessId, promptChars: prompt.length });
