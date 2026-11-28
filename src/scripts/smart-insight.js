@@ -231,7 +231,8 @@ function renderInsightResult(data, restoredAt = null) {
   }
 }
 async function restoreLastInsight() {
-  const session = await window.kasirSessionPromise;
+  await window.kasirSessionPromise;
+  const session = window.kasirSessionData;
   if (!session?.authenticated || !session.username) return;
   try {
     const saved = JSON.parse(sessionStorage.getItem(insightStorageKey(session.username)) || "null");
