@@ -8,7 +8,7 @@ function setMenuOpen(open) {
   menuButton.setAttribute("aria-label", open ? "Tutup menu" : "Buka menu");
 }
 
-const currentPage = location.pathname.split("/").pop() || "index.html";
+const currentPage = location.pathname.split("/").pop() || "kasir.html";
 if (siteMenu && !siteMenu.querySelector('a[href="dashboard.html"]')) {
   const dashboardLink = document.createElement("a");
   dashboardLink.className = "header-link";

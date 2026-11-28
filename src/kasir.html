@@ -1,0 +1,252 @@
+<!doctype html>
+<!-- Halaman kasir utama: pemindai barcode, keranjang, pembayaran, dan katalog. -->
+<html lang="id">
+<head>
+  <meta name="robots" content="noindex, nofollow">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1565c0">
+  <title>Kasir Bisa</title>
+  <script src="scripts/auth-guard.js"></script>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="icon" type="image/png" href="icon/Favicon.png">
+  <meta name="google-site-verification" content="NO5RR-pr0YoE4Nm9SYrE1QWnfaNdxSnaZm7iL7YOrng" />
+</head>
+<body>
+  <!-- Navigasi bersama halaman yang memerlukan sesi login. -->
+  <header class="site-header">
+    <a class="brand" href="kasir.html" aria-label="Kasir Bisa, halaman kasir">
+      <img class="brand-logo" src="icon/Favicon.png" alt="" aria-hidden="true">
+      <span><strong>Kasir Bisa</strong><small>Asisten usaha Anda</small></span>
+    </a>
+    <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Buka menu" aria-controls="site-menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <nav id="site-menu" class="header-nav" aria-label="Navigasi utama" hidden>
+      <a class="header-link" href="kasir.html">Kasir</a>
+      <a class="header-link" href="produk.html">Produk &amp; Stok</a>
+      <a class="header-link" href="riwayat.html">Riwayat Transaksi</a>
+      <a class="header-link" href="pusat-perhatian.html">Pusat Perhatian Toko</a>
+      <a class="header-link" href="smart-insight.html">Smart Insight</a>
+      
+      <a class="header-link" href="panduan.html">Panduan</a>
+      <a class="header-link" href="profile.html">Profil Usaha</a>
+      <button id="tombol-keluar" class="header-link logout-button" type="button">Keluar</button>
+    </nav>
+  </header>
+
+  <main>
+    <div id="pesan" class="notice" role="status" aria-live="polite"></div>
+
+    <!-- Area transaksi langsung: kamera/barcode, keranjang, dan pembayaran. -->
+    <section class="transaction-section" aria-labelledby="transaction-title">
+      <div class="transaction-heading">
+        <div>
+          <p class="eyebrow">TRANSAKSI BARU</p>
+          <h1 id="transaction-title">Kasir</h1>
+          <p class="page-subtitle">Pilih produk atau pindai barcode untuk memulai transaksi.</p>
+        </div>
+      </div>
+
+      <div class="transaction-workspace">
+        <details class="scanner-disclosure">
+          <summary><span class="scanner-summary-icon" aria-hidden="true">▦</span><span><strong>Scan barcode</strong><small>Buka kamera untuk memindai produk</small></span><span class="summary-chevron" aria-hidden="true">⌄</span></summary>
+          <section class="scanner-panel" aria-labelledby="scanner-title">
+          <div class="scanner-heading">
+            <div>
+              <p class="eyebrow">SCAN BARCODE</p>
+              <h2 id="scanner-title">Kamera Kasir</h2>
+            </div>
+            <button id="tombol-kamera" class="secondary-button compact" type="button">Nyalakan kamera</button>
+          </div>
+          <div class="camera-frame">
+            <video id="kamera" autoplay playsinline muted></video>
+            <div class="scan-guide" aria-hidden="true"></div>
+            <div id="kamera-belum-aktif" class="camera-placeholder">
+              <span aria-hidden="true">▣</span>
+              <strong>Kamera belum aktif</strong>
+              <small>Izinkan kamera atau gunakan ketik barcode.</small>
+            </div>
+          </div>
+          <div class="scanner-actions">
+            <form id="form-barcode" class="barcode-form">
+              <label for="input-barcode" class="visually-hidden">Ketik barcode</label>
+              <input id="input-barcode" type="text" inputmode="numeric" placeholder="Ketik angka barcode">
+              <button type="submit" class="primary-button search-button" aria-label="Cari barcode">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <circle cx="10.8" cy="10.8" r="6.8"></circle>
+                  <path d="m16 16 4.5 4.5"></path>
+                </svg>
+              </button>
+            </form>
+            <span id="barcode-terbaca" class="scanner-status">Belum ada barcode terbaca</span>
+          </div>
+          </section>
+        </details>
+
+    <!-- Katalog kasir hanya untuk memilih produk; pengelolaan ada di Produk & Stok. -->
+    <section class="catalog-panel" aria-labelledby="catalog-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">KATALOG</p><h2 id="catalog-title">Pilih produk</h2></div>
+          <a class="secondary-button catalog-add catalog-manage-link" href="produk.html">Kelola produk</a>
+        </div>
+        <div class="product-filters">
+          <label><span class="visually-hidden">Cari produk</span>
+            <input id="cari-produk" type="search" placeholder="Cari produk..." autocomplete="off">
+          </label>
+          <label><span class="visually-hidden">Kategori produk</span>
+            <select id="filter-kategori"></select>
+          </label>
+        </div>
+        <div class="catalog-meta">
+          <span id="jumlah-produk" class="muted"></span>
+          <span class="muted">Pilih produk untuk menambahkannya ke keranjang</span>
+        </div>
+        <div id="daftar-produk" class="product-grid"></div>
+      </section>
+
+        <button id="latar-keranjang-mobile" class="cart-backdrop" type="button" aria-label="Tutup panel keranjang"></button>
+        <aside class="checkout-panel" id="panel-keranjang">
+          <section class="cart-card" aria-labelledby="cart-title">
+            <div class="section-heading">
+              <div><p class="eyebrow">PESANAN</p>
+                <h2 id="cart-title">Keranjang <span id="jumlah-keranjang" class="count-badge">0</span></h2>
+              </div>
+              <div class="cart-heading-actions">
+                <button id="tutup-keranjang-mobile" class="text-button cart-close-mobile" type="button" aria-label="Tutup keranjang">Tutup</button>
+                <button id="kosongkan-keranjang" class="text-button" type="button">Kosongkan</button>
+              </div>
+            </div>
+            <div id="keranjang-kosong" class="empty-state">
+              <span aria-hidden="true">🛒</span>
+              <p>Keranjang masih kosong</p>
+              <small>Scan barcode atau pilih produk di katalog.</small>
+            </div>
+            <div id="daftar-keranjang" class="cart-list"></div>
+            <div class="price-summary">
+              <div><span>Subtotal</span><strong id="subtotal">Rp0</strong></div>
+              <div><span>Diskon</span><strong id="diskon">-Rp0</strong></div>
+              <div><span>PPN 11%</span><strong id="ppn">Rp0</strong></div>
+              <div class="total-row"><span>Total</span><strong id="total">Rp0</strong></div>
+            </div>
+          </section>
+
+          <section class="payment-card" aria-labelledby="payment-title">
+            <p class="eyebrow">PEMBAYARAN</p>
+            <h2 id="payment-title">Pilih pembayaran</h2>
+            <label class="member-option">
+              <input id="member" type="checkbox">
+              <span>Pelanggan member <small>Diskon 10%</small></span>
+            </label>
+            <fieldset class="payment-method-options">
+              <legend>Metode pembayaran</legend>
+              <label class="payment-method-option">
+                <input id="metode-tunai" type="radio" name="metode-pembayaran" value="tunai" checked>
+                <span>Tunai</span>
+              </label>
+              <label class="payment-method-option">
+                <input id="metode-qris" type="radio" name="metode-pembayaran" value="qris">
+                <span>QR <small id="status-pilihan-qris">Tambahkan QR toko terlebih dahulu</small></span>
+              </label>
+            </fieldset>
+            <label id="qris-selection-wrap" class="qris-selection-wrap" for="pilihan-qris" hidden>
+              <span>Pilih QR</span>
+              <select id="pilihan-qris"></select>
+            </label>
+            <div id="qris-management-links" class="qris-management-links" hidden>
+              <a id="link-tambah-qris" class="qris-settings-link" href="qr.html?add=1" data-preserve-cart>＋ Tambah QR</a>
+              <a id="link-lihat-qris" class="qris-settings-link" href="qr.html" data-preserve-cart>Lihat QR</a>
+            </div>
+            <div id="panduan-qris-kasir" class="qris-checkout-guide" hidden>
+              <img id="gambar-qris-kasir" alt="QR toko untuk dipindai pelanggan">
+              <p>Minta pelanggan memindai QR ini. Pastikan dana sudah masuk di aplikasi Anda sebelum mengonfirmasi pembayaran.</p>
+            </div>
+            <form id="form-pembayaran" novalidate>
+              <div id="baris-uang-diterima">
+                <label class="amount-field" for="bayar">
+                  <span class="currency-prefix">Rp</span>
+                  <input id="bayar" type="number" min="0" step="1" inputmode="numeric" placeholder="0" required>
+                </label>
+                <div id="nominal-cepat" class="quick-amounts" aria-label="Pilihan nominal pembayaran"></div>
+              </div>
+              <div id="baris-kembalian" class="change-row"><span>Kembalian</span><strong id="kembalian">Rp0</strong></div>
+              <button id="tombol-bayar" class="primary-button" type="submit" disabled>Bayar</button>
+            </form>
+          </section>
+        </aside>
+      </div>
+      <button id="tombol-keranjang-mobile" class="mobile-cart-trigger" type="button" aria-controls="panel-keranjang" aria-expanded="false">
+        <span class="mobile-cart-icon" aria-hidden="true">🛒<span id="jumlah-keranjang-mobile" class="mobile-cart-count">0</span></span>
+        <span class="mobile-cart-label"><strong>Keranjang</strong><small id="total-keranjang-mobile">Rp0</small></span>
+        <span class="mobile-cart-action">Lihat <span aria-hidden="true">›</span></span>
+      </button>
+    </section>
+
+
+
+
+  </main>
+
+  <dialog id="dialog-transaksi" aria-labelledby="judul-dialog">
+    <div id="langkah-konfirmasi">
+      <p class="eyebrow">PERIKSA PESANAN</p>
+      <h2 id="judul-dialog">Konfirmasi pembayaran</h2>
+      <div id="ringkasan-konfirmasi" class="dialog-summary"></div>
+      <div id="konfirmasi-qris" class="qris-confirmation" hidden>
+        <p>Periksa aplikasi pembayaran Anda. Simpan transaksi hanya setelah dana sebesar total belanja benar-benar diterima.</p>
+      </div>
+      <div class="dialog-actions">
+        <button id="batal-konfirmasi" class="secondary-button" type="button">Kembali</button>
+        <button id="konfirmasi-pembayaran" class="primary-button" type="button">Konfirmasi &amp; bayar</button>
+      </div>
+    </div>
+    <div id="langkah-struk" hidden>
+      <p class="eyebrow">TRANSAKSI BERHASIL</p>
+      <h2>Rincian transaksi</h2>
+      <div id="rincian-struk" class="receipt-preview"></div>
+      <div class="receipt-actions">
+        <button id="simpan-struk" class="secondary-button" type="button">Simpan gambar</button>
+        <button id="bagikan-struk" class="secondary-button" type="button">Bagikan</button>
+        <button id="cetak-struk" class="secondary-button" type="button">Cetak</button>
+      </div>
+      <button id="tutup-struk" class="primary-button" type="button">Selesai</button>
+    </div>
+  </dialog>
+
+  <dialog id="dialog-produk" aria-labelledby="judul-dialog-produk">
+    <form id="form-produk">
+      <p class="eyebrow">DATA KATALOG</p>
+      <h2 id="judul-dialog-produk">Tambah produk</h2>
+      <input id="produk-kode" type="hidden">
+      <div class="product-form-grid">
+        <label>Nama produk<input id="produk-nama" type="text" required></label>
+        <label>Barcode<input id="produk-barcode" type="text" inputmode="numeric" required></label>
+        <label>Kategori<input id="produk-kategori" type="text" required></label>
+        <label>Harga<input id="produk-harga" type="number" min="1" step="1" required></label>
+        <label>Stok<input id="produk-stok" type="number" min="0" step="1" required></label>
+        <label class="product-image-field">Foto produk (opsional)
+          <input id="produk-gambar" type="file" accept="image/jpeg,image/png,image/webp">
+          <small>JPG, PNG, atau WebP. Foto otomatis diperkecil sebelum disimpan.</small>
+        </label>
+        <div id="produk-gambar-pratinjau" class="product-image-preview" hidden>
+          <img id="produk-gambar-img" alt="Pratinjau foto produk">
+          <button id="hapus-produk-gambar" class="secondary-button" type="button">Hapus foto</button>
+        </div>
+        <p id="produk-gambar-status" class="product-image-status" role="status" aria-live="polite"></p>
+      </div>
+      <div class="dialog-actions">
+        <button id="batal-produk" class="secondary-button" type="button">Batal</button>
+        <button class="primary-button" type="submit">Simpan produk</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="struk-cetak" aria-hidden="true"></div>
+  <audio id="suara-transaksi-sukses" src="assets/sfx/buy.mp3" preload="auto"></audio>
+  <!-- Urutan penting: logika domain dan utilitas gambar harus ada sebelum app.js. -->
+  <script src="scripts/kasir.js"></script>
+  <script src="scripts/image-utils.js"></script>
+  <script src="scripts/app.js"></script>
+  <script src="scripts/navigation.js"></script>
+</body>
+</html>

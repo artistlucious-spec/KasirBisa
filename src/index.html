@@ -1,250 +1,231 @@
 <!doctype html>
-<!-- Halaman privat utama: pemindai barcode, keranjang, pembayaran, dan katalog. -->
+<!-- Halaman publik; aplikasi kasir tersedia di /kasir.html. -->
 <html lang="id">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#1565c0">
-  <title>Kasir Bisa</title>
-  <script src="scripts/auth-guard.js"></script>
-  <link rel="stylesheet" href="assets/css/style.css">
+  <title>Aplikasi Kasir Online untuk UMKM dan Kantin | Kasir Bisa</title>
+  <meta name="description" content="Kelola produk, stok, transaksi, riwayat, dan laporan penjualan dalam satu aplikasi kasir berbasis web untuk UMKM, toko kecil, dan kantin.">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://kasirbisa.pages.dev/">
   <link rel="icon" type="image/png" href="icon/Favicon.png">
+  <meta name="google-site-verification" content="NO5RR-pr0YoE4Nm9SYrE1QWnfaNdxSnaZm7iL7YOrng">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="id_ID">
+  <meta property="og:site_name" content="Kasir Bisa">
+  <meta property="og:title" content="Aplikasi Kasir Online untuk UMKM dan Kantin | Kasir Bisa">
+  <meta property="og:description" content="Kelola produk, stok, transaksi, riwayat, dan laporan penjualan dalam satu aplikasi kasir berbasis web.">
+  <meta property="og:url" content="https://kasirbisa.pages.dev/">
+  <meta property="og:image" content="https://kasirbisa.pages.dev/assets/images/kasir-bisa-og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Aplikasi Kasir Online untuk UMKM dan Kantin | Kasir Bisa">
+  <meta name="twitter:description" content="Catat transaksi, pantau stok, dan lihat laporan penjualan dalam satu aplikasi kasir berbasis web.">
+  <meta name="twitter:image" content="https://kasirbisa.pages.dev/assets/images/kasir-bisa-og.png">
+  <link rel="stylesheet" href="assets/css/seo-landing.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "name": "Kasir Bisa",
+        "url": "https://kasirbisa.pages.dev/",
+        "logo": "https://kasirbisa.pages.dev/icon/Favicon.png"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "Kasir Bisa",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web browser",
+        "inLanguage": "id-ID",
+        "url": "https://kasirbisa.pages.dev/",
+        "description": "Aplikasi kasir berbasis web untuk membantu UMKM dan kantin mengelola produk, stok, transaksi, riwayat, dan laporan penjualan.",
+        "featureList": [
+          "Katalog produk dan pengelolaan stok",
+          "Pencatatan transaksi tunai dan QR dengan konfirmasi manual",
+          "Riwayat transaksi dan ekspor CSV",
+          "Ringkasan laporan penjualan dan produk terlaris",
+          "Analisis data usaha melalui Smart Insight"
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Kasir Bisa itu aplikasi kasir online?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Ya. Kasir Bisa adalah aplikasi kasir berbasis web yang digunakan melalui browser. Buat akun atau masuk untuk mengelola data usaha."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Apa saja yang bisa dikelola di Kasir Bisa?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Anda dapat mengelola katalog dan stok produk, mencatat transaksi, melihat riwayat, mengunduh CSV, serta memeriksa ringkasan laporan penjualan."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Apakah pembayaran QR otomatis terverifikasi?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Tidak. Pembayaran QR perlu diperiksa secara manual melalui aplikasi bank atau dompet digital sebelum transaksi disimpan."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Untuk usaha apa Kasir Bisa cocok digunakan?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Kasir Bisa ditujukan untuk pemilik UMKM, toko kecil, dan kantin yang ingin mencatat penjualan serta memantau stok melalui aplikasi kasir berbasis web."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
-  <!-- Navigasi bersama halaman yang memerlukan sesi login. -->
-  <header class="site-header">
-    <a class="brand" href="index.html" aria-label="Kasir Bisa, halaman kasir">
-      <img class="brand-logo" src="icon/Favicon.png" alt="" aria-hidden="true">
-      <span><strong>Kasir Bisa</strong><small>Asisten usaha Anda</small></span>
-    </a>
-    <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Buka menu" aria-controls="site-menu" aria-expanded="false">
-      <span></span><span></span><span></span>
-    </button>
-    <nav id="site-menu" class="header-nav" aria-label="Navigasi utama" hidden>
-      <a class="header-link" href="index.html">Kasir</a>
-      <a class="header-link" href="produk.html">Produk &amp; Stok</a>
-      <a class="header-link" href="riwayat.html">Riwayat Transaksi</a>
-      <a class="header-link" href="pusat-perhatian.html">Pusat Perhatian Toko</a>
-      <a class="header-link" href="smart-insight.html">Smart Insight</a>
-      
-      <a class="header-link" href="panduan.html">Panduan</a>
-      <a class="header-link" href="profile.html">Profil Usaha</a>
-      <button id="tombol-keluar" class="header-link logout-button" type="button">Keluar</button>
-    </nav>
+  <a class="skip-link" href="#konten">Lewati ke konten utama</a>
+  <header class="seo-header">
+    <div class="seo-container seo-header-inner">
+      <a class="seo-brand" href="/" aria-label="Kasir Bisa, beranda">
+        <img src="icon/Favicon.png" width="42" height="42" alt="">
+        <span><strong>Kasir Bisa</strong><small>Asisten usaha Anda</small></span>
+      </a>
+      <nav class="seo-nav" aria-label="Navigasi utama">
+        <a href="#fitur">Fitur</a>
+        <a href="#cara-kerja">Cara kerja</a>
+        <a href="#faq">Pertanyaan umum</a>
+      </nav>
+      <div class="seo-header-actions">
+        <a class="seo-login" href="login.html">Masuk</a>
+        <a class="seo-button seo-button-small" href="signup.html">Daftar usaha</a>
+      </div>
+    </div>
   </header>
 
-  <main>
-    <div id="pesan" class="notice" role="status" aria-live="polite"></div>
-
-    <!-- Area transaksi langsung: kamera/barcode, keranjang, dan pembayaran. -->
-    <section class="transaction-section" aria-labelledby="transaction-title">
-      <div class="transaction-heading">
-        <div>
-          <p class="eyebrow">TRANSAKSI BARU</p>
-          <h1 id="transaction-title">Kasir</h1>
-          <p class="page-subtitle">Pilih produk atau pindai barcode untuk memulai transaksi.</p>
+  <main id="konten" class="seo-container">
+    <section class="seo-hero" aria-labelledby="judul-utama">
+      <div class="seo-hero-copy">
+        <p class="seo-eyebrow">APLIKASI KASIR BERBASIS WEB</p>
+        <h1 id="judul-utama">Aplikasi kasir online sederhana untuk UMKM dan kantin</h1>
+        <p class="seo-lead">Catat penjualan, kelola produk dan stok, lalu periksa laporan usaha dari satu tempat. Kasir Bisa membantu pekerjaan kasir harian tanpa membuat alur usaha terasa rumit.</p>
+        <div class="seo-hero-actions">
+          <a class="seo-button" href="signup.html">Buat akun usaha</a>
+          <a class="seo-button seo-button-secondary" href="login.html">Saya sudah punya akun</a>
         </div>
+        <p class="seo-note">Data setiap usaha disimpan pada ruang akun yang terpisah.</p>
       </div>
-
-      <div class="transaction-workspace">
-        <details class="scanner-disclosure">
-          <summary><span class="scanner-summary-icon" aria-hidden="true">▦</span><span><strong>Scan barcode</strong><small>Buka kamera untuk memindai produk</small></span><span class="summary-chevron" aria-hidden="true">⌄</span></summary>
-          <section class="scanner-panel" aria-labelledby="scanner-title">
-          <div class="scanner-heading">
-            <div>
-              <p class="eyebrow">SCAN BARCODE</p>
-              <h2 id="scanner-title">Kamera Kasir</h2>
-            </div>
-            <button id="tombol-kamera" class="secondary-button compact" type="button">Nyalakan kamera</button>
-          </div>
-          <div class="camera-frame">
-            <video id="kamera" autoplay playsinline muted></video>
-            <div class="scan-guide" aria-hidden="true"></div>
-            <div id="kamera-belum-aktif" class="camera-placeholder">
-              <span aria-hidden="true">▣</span>
-              <strong>Kamera belum aktif</strong>
-              <small>Izinkan kamera atau gunakan ketik barcode.</small>
-            </div>
-          </div>
-          <div class="scanner-actions">
-            <form id="form-barcode" class="barcode-form">
-              <label for="input-barcode" class="visually-hidden">Ketik barcode</label>
-              <input id="input-barcode" type="text" inputmode="numeric" placeholder="Ketik angka barcode">
-              <button type="submit" class="primary-button search-button" aria-label="Cari barcode">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <circle cx="10.8" cy="10.8" r="6.8"></circle>
-                  <path d="m16 16 4.5 4.5"></path>
-                </svg>
-              </button>
-            </form>
-            <span id="barcode-terbaca" class="scanner-status">Belum ada barcode terbaca</span>
-          </div>
-          </section>
-        </details>
-
-    <!-- Katalog kasir hanya untuk memilih produk; pengelolaan ada di Produk & Stok. -->
-    <section class="catalog-panel" aria-labelledby="catalog-title">
-        <div class="section-heading">
-          <div><p class="eyebrow">KATALOG</p><h2 id="catalog-title">Pilih produk</h2></div>
-          <a class="secondary-button catalog-add catalog-manage-link" href="produk.html">Kelola produk</a>
-        </div>
-        <div class="product-filters">
-          <label><span class="visually-hidden">Cari produk</span>
-            <input id="cari-produk" type="search" placeholder="Cari produk..." autocomplete="off">
-          </label>
-          <label><span class="visually-hidden">Kategori produk</span>
-            <select id="filter-kategori"></select>
-          </label>
-        </div>
-        <div class="catalog-meta">
-          <span id="jumlah-produk" class="muted"></span>
-          <span class="muted">Pilih produk untuk menambahkannya ke keranjang</span>
-        </div>
-        <div id="daftar-produk" class="product-grid"></div>
-      </section>
-
-        <button id="latar-keranjang-mobile" class="cart-backdrop" type="button" aria-label="Tutup panel keranjang"></button>
-        <aside class="checkout-panel" id="panel-keranjang">
-          <section class="cart-card" aria-labelledby="cart-title">
-            <div class="section-heading">
-              <div><p class="eyebrow">PESANAN</p>
-                <h2 id="cart-title">Keranjang <span id="jumlah-keranjang" class="count-badge">0</span></h2>
-              </div>
-              <div class="cart-heading-actions">
-                <button id="tutup-keranjang-mobile" class="text-button cart-close-mobile" type="button" aria-label="Tutup keranjang">Tutup</button>
-                <button id="kosongkan-keranjang" class="text-button" type="button">Kosongkan</button>
-              </div>
-            </div>
-            <div id="keranjang-kosong" class="empty-state">
-              <span aria-hidden="true">🛒</span>
-              <p>Keranjang masih kosong</p>
-              <small>Scan barcode atau pilih produk di katalog.</small>
-            </div>
-            <div id="daftar-keranjang" class="cart-list"></div>
-            <div class="price-summary">
-              <div><span>Subtotal</span><strong id="subtotal">Rp0</strong></div>
-              <div><span>Diskon</span><strong id="diskon">-Rp0</strong></div>
-              <div><span>PPN 11%</span><strong id="ppn">Rp0</strong></div>
-              <div class="total-row"><span>Total</span><strong id="total">Rp0</strong></div>
-            </div>
-          </section>
-
-          <section class="payment-card" aria-labelledby="payment-title">
-            <p class="eyebrow">PEMBAYARAN</p>
-            <h2 id="payment-title">Pilih pembayaran</h2>
-            <label class="member-option">
-              <input id="member" type="checkbox">
-              <span>Pelanggan member <small>Diskon 10%</small></span>
-            </label>
-            <fieldset class="payment-method-options">
-              <legend>Metode pembayaran</legend>
-              <label class="payment-method-option">
-                <input id="metode-tunai" type="radio" name="metode-pembayaran" value="tunai" checked>
-                <span>Tunai</span>
-              </label>
-              <label class="payment-method-option">
-                <input id="metode-qris" type="radio" name="metode-pembayaran" value="qris">
-                <span>QR <small id="status-pilihan-qris">Tambahkan QR toko terlebih dahulu</small></span>
-              </label>
-            </fieldset>
-            <label id="qris-selection-wrap" class="qris-selection-wrap" for="pilihan-qris" hidden>
-              <span>Pilih QR</span>
-              <select id="pilihan-qris"></select>
-            </label>
-            <div id="qris-management-links" class="qris-management-links" hidden>
-              <a id="link-tambah-qris" class="qris-settings-link" href="qr.html?add=1" data-preserve-cart>＋ Tambah QR</a>
-              <a id="link-lihat-qris" class="qris-settings-link" href="qr.html" data-preserve-cart>Lihat QR</a>
-            </div>
-            <div id="panduan-qris-kasir" class="qris-checkout-guide" hidden>
-              <img id="gambar-qris-kasir" alt="QR toko untuk dipindai pelanggan">
-              <p>Minta pelanggan memindai QR ini. Pastikan dana sudah masuk di aplikasi Anda sebelum mengonfirmasi pembayaran.</p>
-            </div>
-            <form id="form-pembayaran" novalidate>
-              <div id="baris-uang-diterima">
-                <label class="amount-field" for="bayar">
-                  <span class="currency-prefix">Rp</span>
-                  <input id="bayar" type="number" min="0" step="1" inputmode="numeric" placeholder="0" required>
-                </label>
-                <div id="nominal-cepat" class="quick-amounts" aria-label="Pilihan nominal pembayaran"></div>
-              </div>
-              <div id="baris-kembalian" class="change-row"><span>Kembalian</span><strong id="kembalian">Rp0</strong></div>
-              <button id="tombol-bayar" class="primary-button" type="submit" disabled>Bayar</button>
-            </form>
-          </section>
-        </aside>
-      </div>
-      <button id="tombol-keranjang-mobile" class="mobile-cart-trigger" type="button" aria-controls="panel-keranjang" aria-expanded="false">
-        <span class="mobile-cart-icon" aria-hidden="true">🛒<span id="jumlah-keranjang-mobile" class="mobile-cart-count">0</span></span>
-        <span class="mobile-cart-label"><strong>Keranjang</strong><small id="total-keranjang-mobile">Rp0</small></span>
-        <span class="mobile-cart-action">Lihat <span aria-hidden="true">›</span></span>
-      </button>
+      <aside class="seo-workflow-card" aria-label="Alur utama Kasir Bisa">
+        <p class="seo-eyebrow">SATU ALUR KERJA</p>
+        <h2>Dari produk sampai laporan</h2>
+        <ol>
+          <li><span>01</span><div><strong>Kelola katalog</strong><small>Atur nama, harga, barcode, dan stok.</small></div></li>
+          <li><span>02</span><div><strong>Catat transaksi</strong><small>Periksa total, pembayaran, dan struk.</small></div></li>
+          <li><span>03</span><div><strong>Pantau hasil</strong><small>Lihat riwayat, stok, dan ringkasan penjualan.</small></div></li>
+        </ol>
+      </aside>
     </section>
 
+    <section id="fitur" class="seo-section" aria-labelledby="judul-fitur">
+      <div class="seo-section-heading">
+        <p class="seo-eyebrow">FITUR UTAMA</p>
+        <h2 id="judul-fitur">Hal penting untuk operasional kasir harian</h2>
+        <p>Gunakan fitur sesuai kebutuhan usaha—mulai dari pencatatan barang sampai pemeriksaan penjualan.</p>
+      </div>
+      <div class="seo-feature-grid">
+        <article class="seo-feature-card">
+          <span class="seo-feature-number" aria-hidden="true">01</span>
+          <h3>Produk dan stok</h3>
+          <p>Kelola katalog produk, harga, kategori, barcode, dan jumlah stok. Cari produk atau gunakan pemindai barcode saat menyiapkan transaksi.</p>
+        </article>
+        <article class="seo-feature-card">
+          <span class="seo-feature-number" aria-hidden="true">02</span>
+          <h3>Transaksi dan struk</h3>
+          <p>Periksa barang, diskon yang berlaku, PPN, total, dan kembalian. Stok diperbarui setelah transaksi berhasil disimpan.</p>
+        </article>
+        <article class="seo-feature-card">
+          <span class="seo-feature-number" aria-hidden="true">03</span>
+          <h3>Riwayat dan laporan</h3>
+          <p>Telusuri transaksi berdasarkan periode atau produk, periksa rincian pembayaran, dan unduh data yang ditampilkan sebagai CSV.</p>
+        </article>
+        <article class="seo-feature-card">
+          <span class="seo-feature-number" aria-hidden="true">04</span>
+          <h3>Smart Insight</h3>
+          <p>Baca ringkasan kondisi penjualan dan stok untuk membantu menentukan hal yang perlu diperiksa. Tinjau saran sebelum mengambil tindakan.</p>
+        </article>
+      </div>
+      <p class="seo-payment-note"><strong>Catatan pembayaran QR:</strong> konfirmasi pembayaran dilakukan secara manual. Periksa dana masuk melalui aplikasi bank atau dompet digital sebelum menyimpan transaksi.</p>
+    </section>
 
+    <section id="cara-kerja" class="seo-how" aria-labelledby="judul-cara-kerja">
+      <div>
+        <p class="seo-eyebrow">MULAI MENGGUNAKAN</p>
+        <h2 id="judul-cara-kerja">Cara menggunakan aplikasi kasir Kasir Bisa</h2>
+        <p>Kasir Bisa berjalan melalui browser. Anda tidak perlu memasang aplikasi desktop untuk membuka halaman kasir.</p>
+      </div>
+      <ol class="seo-steps">
+        <li><strong>Daftarkan usaha</strong><span>Buat akun dengan nama usaha, nama pengguna, nomor WhatsApp, dan kata sandi.</span></li>
+        <li><strong>Masukkan produk</strong><span>Tambahkan produk, harga jual, barcode, kategori, dan stok awal.</span></li>
+        <li><strong>Catat dan tinjau</strong><span>Simpan transaksi yang telah diperiksa, lalu buka riwayat atau laporan untuk melihat hasilnya.</span></li>
+      </ol>
+    </section>
 
+    <section id="faq" class="seo-section seo-faq" aria-labelledby="judul-faq">
+      <div class="seo-section-heading">
+        <p class="seo-eyebrow">FAQ</p>
+        <h2 id="judul-faq">Pertanyaan tentang aplikasi kasir Kasir Bisa</h2>
+      </div>
+      <details>
+        <summary>Kasir Bisa itu aplikasi kasir online?</summary>
+        <p>Ya. Kasir Bisa adalah aplikasi kasir berbasis web yang digunakan melalui browser. Buat akun atau masuk untuk mengelola data usaha.</p>
+      </details>
+      <details>
+        <summary>Apa saja yang bisa dikelola di Kasir Bisa?</summary>
+        <p>Anda dapat mengelola katalog dan stok produk, mencatat transaksi, melihat riwayat, mengunduh CSV, serta memeriksa ringkasan laporan penjualan.</p>
+      </details>
+      <details>
+        <summary>Apakah pembayaran QR otomatis terverifikasi?</summary>
+        <p>Tidak. Pembayaran QR perlu diperiksa secara manual melalui aplikasi bank atau dompet digital sebelum transaksi disimpan.</p>
+      </details>
+      <details>
+        <summary>Untuk usaha apa Kasir Bisa cocok digunakan?</summary>
+        <p>Kasir Bisa ditujukan untuk pemilik UMKM, toko kecil, dan kantin yang ingin mencatat penjualan serta memantau stok melalui aplikasi kasir berbasis web.</p>
+      </details>
+      <p class="seo-help-link">Butuh petunjuk akun? Baca <a href="cara-masuk.html">cara masuk atau daftar Kasir Bisa</a>.</p>
+    </section>
 
+    <section class="seo-final-cta" aria-labelledby="judul-cta">
+      <div>
+        <p class="seo-eyebrow">MULAI DARI KATALOG USAHA</p>
+        <h2 id="judul-cta">Siapkan pencatatan penjualan dengan lebih rapi</h2>
+        <p>Buat akun usaha untuk mulai mengatur produk, stok, dan transaksi di Kasir Bisa.</p>
+      </div>
+      <a class="seo-button" href="signup.html">Daftar usaha</a>
+    </section>
   </main>
 
-  <dialog id="dialog-transaksi" aria-labelledby="judul-dialog">
-    <div id="langkah-konfirmasi">
-      <p class="eyebrow">PERIKSA PESANAN</p>
-      <h2 id="judul-dialog">Konfirmasi pembayaran</h2>
-      <div id="ringkasan-konfirmasi" class="dialog-summary"></div>
-      <div id="konfirmasi-qris" class="qris-confirmation" hidden>
-        <p>Periksa aplikasi pembayaran Anda. Simpan transaksi hanya setelah dana sebesar total belanja benar-benar diterima.</p>
-      </div>
-      <div class="dialog-actions">
-        <button id="batal-konfirmasi" class="secondary-button" type="button">Kembali</button>
-        <button id="konfirmasi-pembayaran" class="primary-button" type="button">Konfirmasi &amp; bayar</button>
-      </div>
+  <footer class="seo-footer">
+    <div class="seo-container seo-footer-inner">
+      <a class="seo-brand" href="/" aria-label="Kasir Bisa, beranda">
+        <img src="icon/Favicon.png" width="36" height="36" alt="">
+        <span><strong>Kasir Bisa</strong><small>Aplikasi kasir berbasis web</small></span>
+      </a>
+      <nav aria-label="Tautan bantuan">
+        <a href="cara-masuk.html">Cara masuk atau daftar</a>
+        <a href="login.html">Masuk</a>
+        <a href="signup.html">Daftar usaha</a>
+      </nav>
+      <p>&copy; Kasir Bisa</p>
     </div>
-    <div id="langkah-struk" hidden>
-      <p class="eyebrow">TRANSAKSI BERHASIL</p>
-      <h2>Rincian transaksi</h2>
-      <div id="rincian-struk" class="receipt-preview"></div>
-      <div class="receipt-actions">
-        <button id="simpan-struk" class="secondary-button" type="button">Simpan gambar</button>
-        <button id="bagikan-struk" class="secondary-button" type="button">Bagikan</button>
-        <button id="cetak-struk" class="secondary-button" type="button">Cetak</button>
-      </div>
-      <button id="tutup-struk" class="primary-button" type="button">Selesai</button>
-    </div>
-  </dialog>
-
-  <dialog id="dialog-produk" aria-labelledby="judul-dialog-produk">
-    <form id="form-produk">
-      <p class="eyebrow">DATA KATALOG</p>
-      <h2 id="judul-dialog-produk">Tambah produk</h2>
-      <input id="produk-kode" type="hidden">
-      <div class="product-form-grid">
-        <label>Nama produk<input id="produk-nama" type="text" required></label>
-        <label>Barcode<input id="produk-barcode" type="text" inputmode="numeric" required></label>
-        <label>Kategori<input id="produk-kategori" type="text" required></label>
-        <label>Harga<input id="produk-harga" type="number" min="1" step="1" required></label>
-        <label>Stok<input id="produk-stok" type="number" min="0" step="1" required></label>
-        <label class="product-image-field">Foto produk (opsional)
-          <input id="produk-gambar" type="file" accept="image/jpeg,image/png,image/webp">
-          <small>JPG, PNG, atau WebP. Foto otomatis diperkecil sebelum disimpan.</small>
-        </label>
-        <div id="produk-gambar-pratinjau" class="product-image-preview" hidden>
-          <img id="produk-gambar-img" alt="Pratinjau foto produk">
-          <button id="hapus-produk-gambar" class="secondary-button" type="button">Hapus foto</button>
-        </div>
-        <p id="produk-gambar-status" class="product-image-status" role="status" aria-live="polite"></p>
-      </div>
-      <div class="dialog-actions">
-        <button id="batal-produk" class="secondary-button" type="button">Batal</button>
-        <button class="primary-button" type="submit">Simpan produk</button>
-      </div>
-    </form>
-  </dialog>
-
-  <div id="struk-cetak" aria-hidden="true"></div>
-  <audio id="suara-transaksi-sukses" src="assets/sfx/buy.mp3" preload="auto"></audio>
-  <!-- Urutan penting: logika domain dan utilitas gambar harus ada sebelum app.js. -->
-  <script src="scripts/kasir.js"></script>
-  <script src="scripts/image-utils.js"></script>
-  <script src="scripts/app.js"></script>
-  <script src="scripts/navigation.js"></script>
+  </footer>
 </body>
 </html>

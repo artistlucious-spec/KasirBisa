@@ -1,0 +1,29 @@
+# Keep authenticated application pages and account forms out of search results.
+/kasir.html
+  X-Robots-Tag: noindex, nofollow
+/dashboard.html
+  X-Robots-Tag: noindex, nofollow
+/admin.html
+  X-Robots-Tag: noindex, nofollow
+/produk.html
+  X-Robots-Tag: noindex, nofollow
+/riwayat.html
+  X-Robots-Tag: noindex, nofollow
+/pusat-perhatian.html
+  X-Robots-Tag: noindex, nofollow
+/smart-insight.html
+  X-Robots-Tag: noindex, nofollow
+/laporan.html
+  X-Robots-Tag: noindex, nofollow
+/profile.html
+  X-Robots-Tag: noindex, nofollow
+/qr.html
+  X-Robots-Tag: noindex, nofollow
+/panduan.html
+  X-Robots-Tag: noindex, nofollow
+/rekap.html
+  X-Robots-Tag: noindex, nofollow
+/login*
+  X-Robots-Tag: noindex, nofollow
+/signup*
+  X-Robots-Tag: noindex, nofollow
