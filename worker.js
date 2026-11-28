@@ -327,7 +327,15 @@ async function sendWhatsAppLoginCode(env, whatsapp, code) {
       }
     );
     if (!response.ok) {
-      console.error("[WHATSAPP LOGIN CODE DELIVERY FAILED]", { status: response.status });
+      const result = await response.json().catch(() => null);
+      const providerError = result?.error;
+      console.error("[WHATSAPP LOGIN CODE DELIVERY FAILED]", {
+        status: response.status,
+        code: providerError?.code,
+        subcode: providerError?.error_subcode,
+        type: providerError?.type,
+        message: providerError?.message,
+      });
       return false;
     }
     return true;
@@ -1174,7 +1182,7 @@ function validProductImage(image) {
     && (image === "" || /^data:image\/webp;base64,[A-Za-z0-9+/]+={0,2}$/.test(image));
 }
 
-function parseGeminiJson(text) {
+function parseAiJson(text) {
   const cleaned = text.replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
   try {
     return JSON.parse(cleaned);
@@ -1183,21 +1191,21 @@ function parseGeminiJson(text) {
   }
 }
 
-function getGeminiModel(env) {
-  const configured = typeof env.GEMINI_MODEL === "string" ? env.GEMINI_MODEL.trim() : "";
-  // Abaikan nilai contoh/placeholder agar tidak dikirim sebagai nama model ke Google.
+function getHelipodModel(env) {
+  const configured = typeof env.HELIPOD_MODEL === "string" ? env.HELIPOD_MODEL.trim() : "";
+  // Abaikan nilai contoh/placeholder agar tidak dikirim sebagai nama model.
   if (!configured || /^(MODEL_|ISI_|GANTI_|NAMA_MODEL)/i.test(configured) || /[\s<>]/.test(configured)) {
-    return "gemini-3.8-flash";
+    return "gemini-3-flash";
   }
-  return configured.replace(/^models\//, "");
+  return configured;
 }
 
-function extractGeminiError(data, rawText, status) {
-  const message = data?.error?.message || data?.message || rawText || geminiErrorMessage(status);
+function extractAiError(data, rawText, status) {
+  const message = data?.error?.message || data?.message || rawText || aiErrorMessage(status);
   return String(message).slice(0, 1200);
 }
 
-function geminiErrorMessage(status) {
+function aiErrorMessage(status) {
   const messages = {
     400: "Permintaan analisis ditolak oleh layanan AI.",
     401: "Layanan AI belum dapat diakses. Pengelola perlu memeriksa API key.",
@@ -1730,6 +1738,60 @@ function buildInsightSummary(facts, focus) {
   return `${salesPrefix} ${facts.tren_penjualan.keterangan}`;
 }
 
+const SMART_INSIGHT_CACHE_TTL_SECONDS = 600;
+const SMART_INSIGHT_MAX_PROMPT_CHARS = 6000;
+const SMART_INSIGHT_MAX_OUTPUT_TOKENS = 250;
+
+function clipInsightText(value, maxLength) {
+  return String(value ?? "").slice(0, maxLength);
+}
+
+function buildCompactInsightContext(facts, recommendations) {
+  return {
+    facts: {
+      jumlah_transaksi: facts.jumlah_transaksi,
+      transaksi_7_hari: facts.transaksi_7_hari,
+      total_penjualan: facts.total_penjualan,
+      penjualan_7_hari: facts.penjualan_7_hari,
+      tren_penjualan: {
+        status: facts.tren_penjualan.status,
+        keterangan: clipInsightText(facts.tren_penjualan.keterangan, 160),
+      },
+      produk_terlaris_7_hari: facts.produk_terlaris_7_hari.slice(0, 3).map((item) => ({
+        nama: clipInsightText(item.nama, 60),
+        qty: item.qty,
+      })),
+      risiko_stok: facts.risiko_stok.slice(0, 4).map((item) => ({
+        nama: clipInsightText(item.nama, 60),
+        stok: item.stok,
+        terjual_7_hari: item.terjual_7_hari,
+        hari_tersisa: item.hari_tersisa,
+      })),
+      produk_tidak_bergerak: facts.produk_tidak_bergerak.slice(0, 3).map((item) => ({
+        nama: clipInsightText(item.nama, 60),
+        stok: item.stok,
+      })),
+      kombinasi_produk: facts.kombinasi_produk.slice(0, 2).map((item) => ({
+        produk: item.produk.slice(0, 2).map((name) => clipInsightText(name, 50)),
+        transaksi_bersama: item.transaksi_bersama,
+      })),
+    },
+    recommendations: recommendations.slice(0, 2).map((item) => ({
+      priority: item.priority,
+      title: clipInsightText(item.title, 80),
+      evidence: clipInsightText(item.evidence, 120),
+      action: clipInsightText(item.action, 140),
+    })),
+  };
+}
+
+async function createSmartInsightCacheKey(request, businessId, focus, model, prompt) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${model}\n${prompt}`));
+  const fingerprint = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const origin = new URL(request.url).origin;
+  return new Request(`${origin}/__smart-insight-cache/${encodeURIComponent(businessId)}/${focus}/${fingerprint}`);
+}
+
 async function smartInsightApi(request, env, businessId) {
   // Satu JOIN mengambil transaksi dan item sekaligus; seluruh data dibatasi pada business_id sesi.
   const body = await parseJsonBody(request) || {};
@@ -1868,49 +1930,164 @@ async function smartInsightApi(request, env, businessId) {
     ],
   };
 
-  if (!env.GEMINI_API_KEY) {
-    return json({ success: false, needs_key: true, message: "Analisis berbasis data tetap tersedia tanpa AI.", setup: "Pengelola dapat mengaktifkan Gemini melalui secret GEMINI_API_KEY.", facts, recommendations, insight: fallback, focus });
+  if (!env.HELIPOD_API_KEY) {
+    return json({ success: false, needs_key: true, message: "Analisis berbasis data tetap tersedia tanpa AI.", setup: "Pengelola dapat mengaktifkan AI melalui secret HELIPOD_API_KEY.", facts, recommendations, insight: fallback, focus });
   }
 
-  const model = getGeminiModel(env);
+  const model = getHelipodModel(env);
+  const compactContext = buildCompactInsightContext(facts, recommendations);
   const prompt = `Anda adalah pendamping usaha mikro Indonesia. Gunakan bahasa Indonesia yang sederhana, hangat, tidak menggurui, dan langsung bisa dilakukan.
 Fokus pemilik: ${focus}. Prioritaskan rekomendasi yang relevan dengan fokus tersebut, tetapi jangan abaikan risiko stok yang mendesak.
-Anda hanya boleh merangkum fakta yang diberikan. Jangan menghitung ulang atau mengarang angka, nama produk, harga modal, laba, maupun jam ramai. Jangan menyarankan diskon/harga tanpa data margin.
-Kembalikan JSON valid: {"ringkasan":"maksimal 2 kalimat", "saran_penjualan":"satu tindakan paling penting", "penjelasan_fokus":"satu kalimat yang menjelaskan bagaimana fokus dipakai"}.
-FAKTA: ${JSON.stringify(facts)}
-REKOMENDASI TERHITUNG SISTEM: ${JSON.stringify(recommendations)}`;
+Temuan dan bukti dari rekomendasi sistem adalah fakta. Tindakan sistem hanya referensi; berikan saran AI yang lebih spesifik dan berguna, bukan sekadar menyalinnya. Jangan mengarang angka, nama produk, harga modal, laba, maupun jam ramai. Jangan menyarankan diskon/harga tanpa data margin.
+Buat tepat ${compactContext.recommendations.length} tindakan AI, satu untuk tiap rekomendasi sistem dan dalam urutan yang sama. Tindakan harus realistis, singkat, serta bisa dilakukan pemilik; hindari nasihat umum. Kembalikan JSON valid: {"ringkasan":"maksimal 2 kalimat, 160 karakter", "rekomendasi":[{"tindakan":"maksimal 160 karakter","alasan":"maksimal 100 karakter"}]}.
+FAKTA DAN REKOMENDASI: ${JSON.stringify(compactContext)}`;
+  if (prompt.length > SMART_INSIGHT_MAX_PROMPT_CHARS) {
+    console.warn("[HELIPOD INSIGHT INPUT LIMIT]", { businessId, promptChars: prompt.length });
+    return json({
+      success: false,
+      error: "Analisis AI dilewati agar data yang dikirim tetap terbatas.",
+      detail: "Ringkasan dan rekomendasi berbasis data tetap tersedia.",
+      facts,
+      recommendations,
+      recommendations_source: "worker",
+      insight: fallback,
+      focus
+    });
+  }
+
+  const cache = globalThis.caches?.default;
+  let cacheKey;
+  if (cache) {
+    try {
+      cacheKey = await createSmartInsightCacheKey(request, businessId, focus, model, prompt);
+      const cachedResponse = await cache.match(cacheKey);
+      if (cachedResponse) {
+        const cachedInsight = await cachedResponse.json();
+        const candidates = recommendations.slice(0, 2);
+        if (typeof cachedInsight.ringkasan === "string"
+          && Array.isArray(cachedInsight.recommendations)
+          && cachedInsight.recommendations.length === candidates.length
+          && cachedInsight.recommendations.every((item) => typeof item?.action === "string" && typeof item?.reason === "string")) {
+          const aiRecommendations = candidates.map((item, index) => ({
+            ...item,
+            action: cachedInsight.recommendations[index].action,
+            reason: cachedInsight.recommendations[index].reason,
+          }));
+          return json({
+            success: true,
+            facts,
+            recommendations: aiRecommendations,
+            recommendations_source: "ai",
+            insight: {
+              ...fallback,
+              ringkasan: cachedInsight.ringkasan,
+              saran_penjualan: aiRecommendations[0]?.action || fallback.saran_penjualan,
+            },
+            focus,
+            source: "Helipod + cache",
+            cache_hit: true,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("[SMART_INSIGHT_CACHE READ ERROR]", { businessId, message: error?.message || String(error) });
+      cacheKey = undefined;
+    }
+  }
+
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    const response = await fetch("https://ai.helipod.io/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 500, responseMimeType: "application/json" } }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.HELIPOD_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.2,
+        max_tokens: SMART_INSIGHT_MAX_OUTPUT_TOKENS,
+      }),
     });
     const rawResponse = await response.text();
-    let gemini = {};
-    try { gemini = rawResponse ? JSON.parse(rawResponse) : {}; } catch { gemini = {}; }
+    let providerResponse = {};
+    try { providerResponse = rawResponse ? JSON.parse(rawResponse) : {}; } catch { providerResponse = {}; }
     if (!response.ok) {
-      const providerMessage = extractGeminiError(gemini, rawResponse, response.status);
-      console.error("[GEMINI INSIGHT ERROR]", { status: response.status, model, message: providerMessage });
+      const providerMessage = extractAiError(providerResponse, rawResponse, response.status)
+        .replaceAll(env.HELIPOD_API_KEY, "[redacted]");
+      console.error("[HELIPOD INSIGHT ERROR]", { status: response.status, model, message: providerMessage });
       return json({
         success: false,
         error: "Layanan AI belum dapat digunakan",
-        detail: `${geminiErrorMessage(response.status)} Detail: ${providerMessage}. Rekomendasi berbasis data tetap ditampilkan.`,
+        detail: `${aiErrorMessage(response.status)} Detail: ${providerMessage}. Rekomendasi berbasis data tetap ditampilkan.`,
         facts,
         recommendations,
+        recommendations_source: "worker",
         insight: fallback,
         focus
       }, response.status === 429 || response.status >= 500 ? 503 : 502);
     }
-    const generated = parseGeminiJson(gemini.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("") || "") || {};
+    const generated = parseAiJson(providerResponse.choices?.[0]?.message?.content || "") || {};
+    const candidates = recommendations.slice(0, 2);
+    const generatedRecommendations = Array.isArray(generated.rekomendasi) ? generated.rekomendasi : [];
+    const validAiRecommendations = candidates.length > 0
+      && generatedRecommendations.length === candidates.length
+      && generatedRecommendations.every((item) =>
+        typeof item?.tindakan === "string" && item.tindakan.trim().length > 0 && item.tindakan.length <= 160
+        && typeof item?.alasan === "string" && item.alasan.trim().length > 0 && item.alasan.length <= 100
+      );
+    if (!validAiRecommendations) {
+      return json({
+        success: false,
+        error: "AI belum memberikan saran yang bisa digunakan.",
+        detail: "Saran cadangan berdasarkan data sistem ditampilkan.",
+        facts,
+        recommendations,
+        recommendations_source: "worker",
+        insight: fallback,
+        focus,
+      });
+    }
+    const aiRecommendations = candidates.map((item, index) => ({
+      ...item,
+      action: generatedRecommendations[index].tindakan.trim(),
+      reason: generatedRecommendations[index].alasan.trim(),
+    }));
     const safeInsight = {
       ...fallback,
-      ringkasan: typeof generated.ringkasan === "string" && generated.ringkasan.length < 600 ? generated.ringkasan : fallback.ringkasan,
-      saran_penjualan: typeof generated.saran_penjualan === "string" && generated.saran_penjualan.length < 500 ? generated.saran_penjualan : fallback.saran_penjualan,
+      ringkasan: typeof generated.ringkasan === "string" && generated.ringkasan.length <= 180 ? generated.ringkasan : fallback.ringkasan,
+      saran_penjualan: aiRecommendations[0]?.action || fallback.saran_penjualan,
     };
-    return json({ success: true, facts, recommendations, insight: safeInsight, focus, source: "Gemini + analisis data" });
+    if (cache && cacheKey && typeof generated.ringkasan === "string") {
+      try {
+        await cache.put(cacheKey, new Response(JSON.stringify({
+          ringkasan: safeInsight.ringkasan,
+          recommendations: aiRecommendations.map((item) => ({
+            action: item.action,
+            reason: item.reason,
+          })),
+        }), {
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": `public, max-age=${SMART_INSIGHT_CACHE_TTL_SECONDS}`,
+          },
+        }));
+      } catch (error) {
+        console.error("[SMART_INSIGHT_CACHE WRITE ERROR]", { businessId, message: error?.message || String(error) });
+      }
+    }
+    return json({
+      success: true,
+      facts,
+      recommendations: aiRecommendations,
+      recommendations_source: "ai",
+      insight: safeInsight,
+      focus,
+      source: "Helipod + analisis data",
+    });
   } catch (error) {
-    console.error("[GEMINI INSIGHT NETWORK ERROR]", { model, message: error?.message || String(error) });
-    return json({ success: false, error: "Layanan AI tidak dapat dijangkau", detail: `${error?.message || "Koneksi ke Gemini gagal."} Rekomendasi berbasis data tetap ditampilkan.`, facts, recommendations, insight: fallback, focus }, 503);
+    console.error("[HELIPOD INSIGHT NETWORK ERROR]", { model, message: error?.message || String(error) });
+    return json({ success: false, error: "Layanan AI tidak dapat dijangkau", detail: `${error?.message || "Koneksi ke Helipod gagal."} Saran cadangan berdasarkan data sistem ditampilkan.`, facts, recommendations, recommendations_source: "worker", insight: fallback, focus }, 503);
   }
 }
 

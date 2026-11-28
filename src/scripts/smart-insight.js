@@ -221,9 +221,10 @@ async function generateInsight() {
       keyArea.hidden = false;
       const detail = document.getElementById("insight-setup-detail"); if (detail) detail.textContent = data.setup || "Pengelola dapat mengaktifkan layanan AI.";
       setNotice("Rekomendasi berbasis data aktif. AI tambahan belum diaktifkan oleh pengelola.", "success");
-    } else if (data.cache_hit) setNotice("Hasil analisis yang sama dari 10 menit terakhir digunakan kembali.", "success");
-    else if (data.success) setNotice("Analisis terbaru berhasil dibuat dari data usaha Anda.", "success");
-    else setNotice(data.detail || "Rekomendasi berbasis data ditampilkan tanpa bantuan AI.", "success");
+    } else if (data.cache_hit) setNotice("Saran AI dari analisis 10 menit terakhir digunakan kembali.", "success");
+    else if (data.recommendations_source === "worker") setNotice(data.detail || "AI tidak tersedia; saran cadangan berbasis data sistem ditampilkan.", "error");
+    else if (data.success) setNotice("Saran AI berhasil dibuat berdasarkan temuan dan data usaha.", "success");
+    else setNotice(data.detail || "Saran cadangan berbasis data sistem ditampilkan.", "error");
   } catch (error) {
     setNotice(error.message, "error");
     document.getElementById("insight-ringkasan").textContent = "Smart Insight belum dapat dimuat.";
