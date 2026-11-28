@@ -133,7 +133,7 @@ function setFocus(focus) {
     item.setAttribute("aria-pressed", String(active));
   }
   focusDescription.textContent = focusDescriptions[focus] || focusDescriptions.automatic;
-  generateInsight();
+  setNotice("Fokus analisis diperbarui. Tekan “Analisis sekarang” untuk menjalankan analisis.");
 }
 function renderRecommendations(items) {
   const target = document.getElementById("insight-recommendations");
@@ -221,7 +221,8 @@ async function generateInsight() {
       keyArea.hidden = false;
       const detail = document.getElementById("insight-setup-detail"); if (detail) detail.textContent = data.setup || "Pengelola dapat mengaktifkan layanan AI.";
       setNotice("Rekomendasi berbasis data aktif. AI tambahan belum diaktifkan oleh pengelola.", "success");
-    } else if (data.success) setNotice("Analisis terbaru berhasil dibuat dari data usaha Anda.", "success");
+    } else if (data.cache_hit) setNotice("Hasil analisis yang sama dari 10 menit terakhir digunakan kembali.", "success");
+    else if (data.success) setNotice("Analisis terbaru berhasil dibuat dari data usaha Anda.", "success");
     else setNotice(data.detail || "Rekomendasi berbasis data ditampilkan tanpa bantuan AI.", "success");
   } catch (error) {
     setNotice(error.message, "error");
@@ -233,10 +234,9 @@ async function generateInsight() {
     trendMessage.hidden = false;
     trendMessage.textContent = "Grafik perbandingan penjualan belum dapat dimuat.";
     renderRecommendations([]);
-  } finally { button.disabled = false; button.innerHTML = '<span aria-hidden="true">✦</span> Buat insight baru'; }
+  } finally { button.disabled = false; button.innerHTML = '<span aria-hidden="true">✦</span> Analisis sekarang'; }
 }
 focusButtons.forEach((item) => item.addEventListener("click", () => setFocus(item.dataset.focus)));
 button.addEventListener("click", generateInsight);
 for (const item of focusButtons) { const active = item.dataset.focus === selectedFocus; item.classList.toggle("active", active); item.setAttribute("aria-pressed", String(active)); }
 focusDescription.textContent = focusDescriptions[selectedFocus] || focusDescriptions.automatic;
-generateInsight();

@@ -39,14 +39,14 @@
         <p>Rekomendasi yang membaca transaksi dan stok, lalu membantu Anda menentukan langkah usaha berikutnya.</p>
       </div>
       <button id="buat-insight" class="insight-button" type="button">
-        <span aria-hidden="true">✦</span> Buat insight baru
+        <span aria-hidden="true">✦</span> Analisis sekarang
       </button>
     </section>
 
     <div class="insight-quick-links">
       <a href="laporan.html">Lihat Laporan Penjualan</a>
     </div>
-    <div id="insight-notice" class="notice" role="status" aria-live="polite"></div>
+    <div id="insight-notice" class="notice" role="status" aria-live="polite">Analisis hanya berjalan saat Anda menekan “Analisis sekarang”.</div>
 
     <section class="insight-focus-panel" aria-labelledby="insight-focus-title">
       <div><p class="eyebrow">ARAH ANALISIS</p><h2 id="insight-focus-title">Apa yang ingin Anda tingkatkan?</h2><p>Pilih fokus untuk menyesuaikan ringkasan dan urutan saran. Sistem tetap memeriksa kondisi penting lainnya.</p></div>
@@ -85,7 +85,7 @@
     </section>
 
     <section id="insight-ringkasan" class="insight-summary" aria-live="polite">
-      <span class="insight-loader">Menyiapkan analisis...</span>
+      <p>Belum ada analisis. Pilih fokus, lalu tekan <strong>Analisis sekarang</strong>.</p>
     </section>
 
     <section id="insight-trend" class="insight-trend" aria-labelledby="insight-trend-title" hidden>
@@ -111,33 +111,33 @@
 
     <section class="insight-recommendations-section">
       <div class="insight-section-heading"><div><p class="eyebrow">LANGKAH YANG DISARANKAN</p><h2>Prioritas usaha Anda</h2><p>Setiap saran dilengkapi bukti dan tindakan yang bisa dilakukan.</p></div></div>
-      <div id="insight-recommendations" class="insight-recommendation-list"><p class="empty-state">Menyiapkan rekomendasi...</p></div>
+      <div id="insight-recommendations" class="insight-recommendation-list"><p class="empty-state">Rekomendasi akan tampil setelah analisis dijalankan.</p></div>
     </section>
 
     <section class="insight-detail-grid">
       <article class="insight-detail">
         <div class="insight-icon">↗</div>
-        <div><p>Produk Terlaris</p><h2 id="insight-produk">Memuat...</h2></div>
+        <div><p>Produk Terlaris</p><h2 id="insight-produk">Belum dianalisis</h2></div>
       </article>
       <article class="insight-detail">
         <div class="insight-icon warning">!</div>
-        <div><p>Stok Menipis</p><h2 id="insight-stok">Memuat...</h2></div>
+        <div><p>Stok Menipis</p><h2 id="insight-stok">Belum dianalisis</h2></div>
       </article>
       <article class="insight-detail">
         <div class="insight-icon">◷</div>
-        <div><p>Jam Ramai</p><h2 id="insight-jam">Memuat...</h2></div>
+        <div><p>Jam Ramai</p><h2 id="insight-jam">Belum dianalisis</h2></div>
       </article>
       <article class="insight-detail">
         <div class="insight-icon">✦</div>
-        <div><p>Saran Penjualan</p><h2 id="insight-saran">Memuat...</h2></div>
+        <div><p>Saran Penjualan</p><h2 id="insight-saran">Belum dianalisis</h2></div>
       </article>
     </section>
 
     <section class="insight-facts">
-      <div><span>Jumlah transaksi</span><strong id="fact-transaksi">0</strong></div>
-      <div><span>Total penjualan</span><strong id="fact-total">Rp0</strong></div>
+      <div><span>Jumlah transaksi</span><strong id="fact-transaksi">-</strong></div>
+      <div><span>Total penjualan</span><strong id="fact-total">-</strong></div>
       <div><span>Produk terlaris</span><strong id="fact-produk">-</strong></div>
-      <div><span>Produk stok rendah</span><strong id="fact-stok">0</strong></div>
+      <div><span>Produk stok rendah</span><strong id="fact-stok">-</strong></div>
     </section>
   </main>
 

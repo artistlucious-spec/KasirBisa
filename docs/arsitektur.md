@@ -10,7 +10,7 @@ Browser
   |-- /api/* -> Cloudflare Pages Functions (functions/api/)
                     |-- autentikasi dan logika API (worker.js)
                     |-- D1 melalui binding DB
-                    |-- Gemini API untuk Smart Insight AI (opsional)
+                    |-- Helipod AI Gateway untuk Smart Insight (opsional)
 ```
 
 ## Komponen
@@ -21,13 +21,13 @@ Browser
 - `src/scripts/navigation.js`: menu hamburger pada halaman privat.
 - `src/scripts/image-utils.js`: validasi dasar dan kompresi foto di browser.
 - `functions/api/`: route adapter Pages; setiap adapter meneruskan request ke handler `worker.js`.
-- `worker.js`: memvalidasi autentikasi, mengolah request API, dan mengakses D1. Smart Insight dapat meminta analisis Gemini.
+- `worker.js`: memvalidasi autentikasi, mengolah request API, dan mengakses D1. Smart Insight dapat meminta analisis AI melalui Helipod.
 - `migrations/`: skema dan data awal D1.
 - `src/admin.html` dan `src/scripts/admin.js`: dasbor admin untuk melihat ringkasan akun serta mengubah status aktif.
 
 ## Autentikasi dan profil
 
-1. Pengguna mendaftar usaha dan akun. Login menerima nama pengguna atau nomor WhatsApp beserta password.
+1. Pengguna mendaftar usaha dan akun. Login menerima nama pengguna atau nama usaha beserta password; kode WhatsApp menjadi pilihan saat pengguna lupa password.
 2. Setiap akun terhubung ke satu usaha; seluruh API produk, transaksi, stok, dan insight membatasi kueri berdasarkan usaha pada sesi.
 3. Migrasi `0004_multi_tenant_accounts.sql` memindahkan data dan profil lama ke usaha `legacy-business`. Pengguna lama harus login kembali setelah migrasi karena format sesi berubah.
 4. Jika akun lama belum tersimpan, backend dapat membuatnya dari `KASIR_USERNAME` dan `KASIR_PASSWORD`.

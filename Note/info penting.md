@@ -51,7 +51,7 @@ Jika guru ingin mempunyai alamat website yang berbeda, buat project Pages dan D1
 1. Buat project **Cloudflare Pages** di akun Cloudflare milik guru.
 2. Buat database D1 dengan nama `kasirbisa`. Cloudflare memberikan ID database baru; salin ID itu ke `database_id` di `wrangler.toml`. Pertahankan `database_name = "kasirbisa"` dan `binding = "DB"`.
 3. Pastikan Pages memakai konfigurasi D1 tersebut (binding bernama `DB`) dan memuat Functions dari folder `functions/`.
-4. Atur secret `AUTH_SESSION_SECRET` di environment Pages dengan nilai rahasia acak minimal 32 karakter. Jangan menaruh secret di HTML, JavaScript, atau Git. `GEMINI_API_KEY` opsional; tanpa key, ringkasan dasar tetap tersedia.
+4. Atur secret `AUTH_SESSION_SECRET` di environment Pages dengan nilai rahasia acak minimal 32 karakter. Jangan menaruh secret di HTML, JavaScript, atau Git. `HELIPOD_API_KEY` opsional; tanpa key, ringkasan dasar tetap tersedia.
 5. Setelah memeriksa akun dan ID database sekali lagi, terapkan skema ke D1 **baru**:
 
    ```powershell

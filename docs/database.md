@@ -14,6 +14,7 @@ Kasir Bisa Web menggunakan Cloudflare D1 melalui binding `DB`. Konfigurasi datab
 - `0008_admin_accounts.sql`: menambahkan status aktif/nonaktif akun untuk pengelolaan akses admin.
 - `0009_multiple_payment_qrs.sql`: menambahkan daftar hingga 10 QRIS bernama per usaha, memindahkan gambar QRIS lama, dan menyimpan label QR yang dipakai pada transaksi.
 - `0010_nondestructive_qr_selection.sql`: menyimpan gambar sumber utuh dan area QR terpilih terpisah agar area di luar pilihan tetap dapat digunakan saat mengedit.
+- `0011_business_scoped_qr_names.sql`: membangun ulang tabel QR dengan batas unik nama yang secara eksplisit hanya berlaku di dalam satu usaha, tanpa mengubah batas atau data QR lain.
 
 Jalankan `npm run d1:migrate:local` untuk D1 lokal. Database Cloudflare remote tidak membuat tabel secara otomatis ketika kode di-deploy; migrasi perlu diterapkan secara terpisah. Untuk target pada `wrangler.toml`, periksa dahulu nama dan ID database, lalu jalankan `npx wrangler d1 migrations apply kasirbisa --remote` dari folder project ini (atau `npm run d1:migrate:remote`). Jangan jalankan perintah remote sebelum memastikan akun Cloudflare dan database yang dituju adalah target yang benar. Setelah menerapkan `0005_password_encrypted.sql`, pengguna lama harus login kembali agar aplikasi dapat membuat salinan password terenkripsi dari password yang baru diverifikasi.
 
